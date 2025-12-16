@@ -104,11 +104,11 @@ export class Environment {
     createTreesInstanced() {
         const treeCount = 40;
         
-        const trunkGeo = new THREE.CylinderGeometry(1.5, 2.5, 8, 4);
-        const trunkMat = new THREE.MeshLambertMaterial({ color: 0x5D4037, flatShading: true });
+        const trunkGeo = new THREE.CylinderGeometry(1.5, 2.5, 8, 5);
+        const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5D4037, flatShading: true });
 
         const leafGeo = new THREE.ConeGeometry(7, 10, 6);
-        const leafMat = new THREE.MeshLambertMaterial({ color: 0xFFFFFF, flatShading: true }); 
+        const leafMat = new THREE.MeshStandardMaterial({ color: 0xFFFFFF, flatShading: true }); 
 
         const meshTrunks = new THREE.InstancedMesh(trunkGeo, trunkMat, treeCount);
         this.meshLeavesBottom = new THREE.InstancedMesh(leafGeo, leafMat, treeCount);
@@ -135,6 +135,14 @@ export class Environment {
             // SCHUTZZONE: Dorfplatz und Steg-Zugang freihalten
             if (r < 75) continue;
             if (z > 50 && Math.abs(x) < 20) continue;
+
+            // NEU: Zusätzliche Schutzzone explizit für Mo's Taverne (x: -60, z: 0)
+            // Verhindert Clipping durch den breiten Anbau (foundation: 37.4x30.8 skaliert)
+            if (x < -30 && x > -90 && Math.abs(z) < 30) continue;
+
+            // NEU: Zusätzliche Schutzzone für HQ / Fischerhaus (x: 0, z: -60)
+            // Verhindert Clipping durch Porch (foundation: 31.2x33.6, porch ragt vor)
+            if (Math.abs(x) < 20 && z < -40 && z > -80) continue;
 
             const y = this.getGroundHeight(x, z);
 
@@ -186,7 +194,7 @@ export class Environment {
     createRocksInstanced() {
         const rockCount = 60;
         const geometry = new THREE.DodecahedronGeometry(1, 0);
-        const material = new THREE.MeshLambertMaterial({ color: 0x90A4AE, flatShading: true });
+        const material = new THREE.MeshStandardMaterial({ color: 0x90A4AE, flatShading: true });
 
         const meshRocks = new THREE.InstancedMesh(geometry, material, rockCount);
         meshRocks.castShadow = true;
@@ -228,13 +236,15 @@ export class Environment {
         // Gibt immer noch einen schönen Low-Poly Look mit weniger Vertices
         const puffGeo = new THREE.SphereGeometry(1, 5, 5);
         
-        // Create 20 Cloud Clusters
-        for(let i=0; i<20; i++) {
+        // Create 8 Cloud Clusters
+        for(let i=0; i<8; i++) {
             const group = new THREE.Group();
             
-            const mat = new THREE.MeshLambertMaterial({
+            const mat = new THREE.MeshStandardMaterial({
                 color: 0xFFFFFF, 
-                flatShading: true
+                flatShading: true,
+                roughness: 0.9,
+                metalness: 0.0
             });
             this.cloudMaterials.push(mat);
 
@@ -244,7 +254,7 @@ export class Environment {
             mainPuff.scale.set(mainScale, mainScale, mainScale);
             group.add(mainPuff);
 
-            const numSubPuffs = 3 + Math.floor(Math.random() * 4);
+            const numSubPuffs = 2 + Math.floor(Math.random() * 2);
             for(let j=0; j<numSubPuffs; j++) {
                 const subPuff = new THREE.Mesh(puffGeo, mat);
                 const subScale = mainScale * (0.4 + Math.random() * 0.5);

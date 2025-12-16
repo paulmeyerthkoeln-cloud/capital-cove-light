@@ -10,6 +10,7 @@ import { ui } from '../ui/UIManager.js';
 import { Water } from '../world/Water.js';
 import { Island } from '../world/Island.js';
 import { Environment } from '../world/Environment.js';
+import { SeaCreatureManager } from '../world/SeaCreatures.js';
 import { BuildingManager } from '../entities/Buildings.js';
 import { BoatManager } from '../entities/Boat.js';
 import { PersonManager } from '../entities/Person.js'; 
@@ -25,14 +26,15 @@ class Game {
         this.tickAccumulatorMs = 0;
         this.tickCount = 0;
 
-        // OPTIMIERUNG (Tab A 2016): FPS-Limiter AKTIVIERT
-        // 30 FPS ist besser als schwankende 20-60 FPS (verhindert Überhitzung & CPU-Throttling)
-        this.fpsLimit = 30; // 30 FPS Ziel für Mali-T830 MP1 GPU
-        this.frameMinMs = 1000 / this.fpsLimit;
+        // OPTIMIERUNG: FPS-Limiter für sehr alte Tablets (standardmäßig deaktiviert)
+        // Setze z.B. auf 30 um auf 30 FPS zu limitieren: this.fpsLimit = 30
+        this.fpsLimit = 30; // Stabilisiert Performance auf Schultablets
+        this.frameMinMs = this.fpsLimit ? 1000 / this.fpsLimit : 0;
 
         this.water = null;
         this.island = null;
         this.environment = null;
+        this.seaCreatures = null;
         this.buildings = null;
         this.boatManager = null;
         this.personManager = null;
@@ -52,6 +54,9 @@ class Game {
 
         this.environment = new Environment();
         this.environment.init(this.buildings);
+
+        this.seaCreatures = new SeaCreatureManager();
+        this.seaCreatures.init();
 
         this.boatManager = new BoatManager();
         this.boatManager.init(); 
@@ -95,13 +100,12 @@ class Game {
 
         const deltaMs = nowMs - this.lastFrameTimeMs;
 
-        // OPTIMIERUNG (Tab A 2016): Wenn wir zu schnell sind, warten wir
-        if (deltaMs < this.frameMinMs) {
-            return;
+        // OPTIMIERUNG: FPS-Limiter - Frame überspringen wenn zu früh
+        if (this.fpsLimit && deltaMs < this.frameMinMs) {
+            return; // Frame überspringen
         }
 
-        // Korrektur: Ziehe überschüssige Zeit ab, um Drift zu vermeiden
-        this.lastFrameTimeMs = nowMs - (deltaMs % this.frameMinMs);
+        this.lastFrameTimeMs = nowMs;
 
         this.tickAccumulatorMs += deltaMs * this.speedMultiplier;
 
@@ -110,8 +114,7 @@ class Game {
             this.tickAccumulatorMs -= this.tickLengthMs;
         }
 
-        // Sicherstellen, dass deltaSec nicht explodiert bei Rucklern
-        const deltaSec = Math.min((deltaMs / 1000), 0.1) * this.speedMultiplier;
+        const deltaSec = (deltaMs / 1000) * this.speedMultiplier;
         const totalTime = nowMs / 1000;
 
         this.updateVisuals(deltaSec, totalTime);
@@ -134,11 +137,12 @@ class Game {
         if (this.water) this.water.update(totalTime);
         if (this.environment) this.environment.update(deltaSec);
         if (this.buildings) this.buildings.update(deltaSec);
-        
+        if (this.seaCreatures) this.seaCreatures.update(deltaSec);
+
         if (this.boatManager) this.boatManager.update(deltaSec, totalTime);
         if (this.personManager) this.personManager.update(deltaSec, totalTime);
-        
-        input.update(); 
+
+        input.update();
     }
 
     handleObjectClick(obj) {

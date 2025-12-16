@@ -147,6 +147,7 @@ class Director {
         this.tutorialObjectivesCompleted = false;
         this.bankOfferTimeout = null;
         this.tutorialTavernHintTimer = null;
+        this.tutorialBoatHintTimer = null;
     }
 
     init() {
@@ -301,6 +302,24 @@ class Director {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
+    startTutorialTavernReminder() {
+        if (this.tutorialTavernHintTimer) {
+            clearTimeout(this.tutorialTavernHintTimer);
+        }
+
+        this.tutorialTavernHintTimer = setTimeout(() => {
+            this.tutorialTavernHintTimer = null;
+
+            if (this.currentPhaseId !== 'TUTORIAL') return;
+
+            const obj = this.activeObjectives.find(o => o.id === 'buy_round');
+            if (obj && obj.done) return;
+
+            events.emit(EVENTS.CMD_SHOW_BUILDING_HINT, { type: 'tavern', show: true });
+            events.emit(EVENTS.TOAST, { message: 'Gib eine Runde im Lustigen Lachs aus!' });
+        }, 15000);
+    }
+
     checkTutorialObjectives() {
         if (this.currentPhaseId !== 'TUTORIAL' || this.tutorialObjectivesCompleted) return;
 
@@ -438,7 +457,7 @@ class Director {
         economy.setSimulationActive(true);
     }
 
-    async promptBoatStart(showDialog = true) {
+    async promptBoatStart() {
         ui.hideCinematicCard();
         ui.hideCinematicLayer();
         ui.showUI();
@@ -450,12 +469,8 @@ class Director {
         // Boot-Manager triggern um Hint anzuzeigen
         events.emit(EVENTS.CMD_SHOW_BOAT_HINT, { show: true });
 
-        if (showDialog) {
-            this.triggerScene('D0_INTRO');
-        } else {
-            // Nur ein Toast, wenn kein Dialog (z.B. am Ende des Intros)
-            events.emit(EVENTS.TOAST, { message: 'Klicke auf das Boot, um zu starten!' });
-        }
+        // Hinweis anzeigen statt Dialog
+        events.emit(EVENTS.TOAST, { message: 'Klicke auf das Boot, um zu starten!' });
 
         this.waitingForBoatClick = true;
     }
@@ -515,11 +530,16 @@ class Director {
     // --- INTERAKTION & SZENEN-LOGIK ---
 
     async onBuildingClicked(type, id) {
-        console.log(`🖱️ [DEBUG] Building clicked: type="${type}", id="${id}"`);
-
         // Sonderfall: Tutorial-Abschluss (Boot starten nach Lales Erklärung)
         if (this.waitingForTutorialRelease && type === 'boat') {
             this.waitingForTutorialRelease = false;
+
+            // Timer abbrechen, falls Spieler selbst gestartet hat
+            if (this.tutorialBoatHintTimer) {
+                clearTimeout(this.tutorialBoatHintTimer);
+                this.tutorialBoatHintTimer = null;
+            }
+
             events.emit(EVENTS.CMD_SHOW_BOAT_HINT, { show: false });
 
             // Dialog schließen, falls offen
@@ -533,6 +553,7 @@ class Director {
 
             const bm = window.game.boatManager;
             if (bm && bm.boats[0]) {
+                this.startTutorialTavernReminder();
                 bm.startBoat(0);
                 events.emit(EVENTS.TOAST, { message: 'Der Kreislauf läuft nun automatisch.' });
             }
@@ -1253,8 +1274,18 @@ class Director {
                 input.setLocked(false);
                 setTimeout(() => this.setIslandOverviewCamera(), 200);
                 this.waitingForTutorialRelease = true;
-                events.emit(EVENTS.CMD_SHOW_BOAT_HINT, { show: true });
-                events.emit(EVENTS.TOAST, { message: 'Klicke auf das Boot, um zu starten.' });
+
+                // Verzögerter Hinweis: Zeige erst nach 10 Sekunden an, falls Spieler nicht selbst gestartet hat
+                if (this.tutorialBoatHintTimer) {
+                    clearTimeout(this.tutorialBoatHintTimer);
+                }
+                this.tutorialBoatHintTimer = setTimeout(() => {
+                    // Nur anzeigen, wenn Spieler noch nicht selbst gestartet hat
+                    if (this.waitingForTutorialRelease) {
+                        events.emit(EVENTS.CMD_SHOW_BOAT_HINT, { show: true });
+                        events.emit(EVENTS.TOAST, { message: 'Klicke auf das Boot, um zu starten.' });
+                    }
+                }, 10000); // 10 Sekunden
                 break;
 
             case 'start_crunch_gameplay':
@@ -1678,7 +1709,6 @@ class Director {
                 break;
 
             case 'game_over':
-                console.error(`🚨 [DEBUG] GAME OVER triggered! choice:`, choice);
                 this.endScene();
                 location.reload();
                 break;
@@ -2962,17 +2992,6 @@ class Director {
             this.boomProfitableTrips = 0;
             this.boomProgressShown = false;
             this.boomWarningShown = false;
-        }
-
-        if (phaseId === 'TUTORIAL') {
-            // Nach kurzer Zeit dezenten Hinweis auf Mo zeigen, falls keine Runde ausgegeben wurde
-            this.tutorialTavernHintTimer = setTimeout(() => {
-                if (this.currentPhaseId !== 'TUTORIAL') return;
-                const obj = this.activeObjectives.find(o => o.id === 'buy_round');
-                if (obj && obj.done) return;
-                events.emit(EVENTS.CMD_SHOW_BUILDING_HINT, { type: 'tavern', show: true });
-                events.emit(EVENTS.TOAST, { message: 'Gib eine Runde im Lustigen Lachs aus!' });
-            }, 20000); // 20 Sekunden
         }
 
         events.emit(DIRECTOR_EVENTS.PHASE_CHANGED, {

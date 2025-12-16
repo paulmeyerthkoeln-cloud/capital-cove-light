@@ -29,8 +29,9 @@ export class Island {
 
         this.geometry.computeVertexNormals();
 
-        const material = new THREE.MeshLambertMaterial({
+        const material = new THREE.MeshStandardMaterial({
             vertexColors: true,
+            roughness: 1.0,
             flatShading: true
         });
 

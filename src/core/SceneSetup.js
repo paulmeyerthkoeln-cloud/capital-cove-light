@@ -13,6 +13,7 @@ class SceneSetup {
         this.sunDirection = new THREE.Vector3();
         
         this.interactableObjects = [];
+        this.shadowUpdateFrame = 0;
     }
 
     init() {
@@ -24,34 +25,30 @@ class SceneSetup {
         const skyColor = 0x87CEEB; 
         this.scene.background = new THREE.Color(skyColor);
 
-        // OPTIMIERUNG (Tab A 2016): Nebel dichter für kleinere Far Plane
-        this.fog = new THREE.Fog(skyColor, 200, 900);
+        // UPDATED: Fog matches sky color for seamless horizon
+        this.fog = new THREE.Fog(skyColor, 400, 1600);
         this.scene.fog = this.fog;
 
-        // OPTIMIERUNG (Tab A 2016): Far Plane drastisch reduziert (spart Draw Calls)
-        this.camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 1, 1000);
-        this.camera.position.set(280, 180, 280);
+        this.camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 1, 3000);
+        this.camera.position.set(280, 180, 280); 
         this.camera.lookAt(0, 10, 0);
 
         this.renderer = new THREE.WebGLRenderer({
-            antialias: false, // OPTIMIERUNG (Tab A 2016): Antialiasing AUS auf alten Tablets!
+            antialias: false, // PERFORMANCE: AA aus für massive FPS-Gewinne auf Tablets
             alpha: false,
             powerPreference: "high-performance",
-            precision: "mediump", // "highp" ist auf alten Geräten oft langsam
-            stencil: false, // Stencil Buffer nicht benötigt -> spart Speicher
-            depth: true // Depth Buffer brauchen wir für korrekte Überlappung
+            stencil: false, // PERFORMANCE: Stencil Buffer deaktivieren wenn nicht benötigt
+            depth: true
         });
-
-        // OPTIMIERUNG (Tab A 2016): Pixel Ratio deckeln!
-        // Tab A 2016 hat hohe Auflösung (1920x1200) aber schwache Mali-T830 MP1 GPU.
-        // Wir rendern intern kleiner (0.85x) und der Browser skaliert hoch.
-        const pixelRatio = Math.min(window.devicePixelRatio, 1.0);
-        this.renderer.setPixelRatio(pixelRatio > 1 ? 1 : 0.85);
+        
+        // PERFORMANCE: Retina-Displays rendern wir nur mit Pixelratio 1 für Tablets/Mobile.
+        this.renderer.setPixelRatio(1.0);
         this.renderer.setSize(window.innerWidth, window.innerHeight);
 
         this.renderer.shadowMap.enabled = true;
         // OPTIMIERUNG: BasicShadowMap statt PCFSoftShadowMap für bessere Performance
         this.renderer.shadowMap.type = THREE.BasicShadowMap;
+        this.renderer.shadowMap.autoUpdate = false;
 
         if (container) {
             container.innerHTML = '';
@@ -73,20 +70,20 @@ class SceneSetup {
         this.dirLight.position.set(-150, 200, 100);
         this.dirLight.castShadow = true;
 
-        // OPTIMIERUNG (Tab A 2016): Shadow Map auf 1024 für Tablet-Performance
-        this.dirLight.shadow.mapSize.width = 1024;
-        this.dirLight.shadow.mapSize.height = 1024;
+        // OPTIMIERUNG: Shadow Map auf 512 reduziert für Tablets (war 1024)
+        this.dirLight.shadow.mapSize.width = 512;
+        this.dirLight.shadow.mapSize.height = 512;
         this.dirLight.shadow.camera.near = 0.5;
         this.dirLight.shadow.camera.far = 1000;
-
-        const d = 350;
+        
+        const d = 350; 
         this.dirLight.shadow.camera.left = -d;
         this.dirLight.shadow.camera.right = d;
         this.dirLight.shadow.camera.top = d;
         this.dirLight.shadow.camera.bottom = -d;
-
-        // OPTIMIERUNG (Tab A 2016): Bias für BasicShadowMap angepasst
-        this.dirLight.shadow.bias = -0.0005;
+        
+        // Schatten-Bias anheben, um Shadow Acne zu reduzieren
+        this.dirLight.shadow.bias = -0.001;
         this.dirLight.shadow.normalBias = 0.05;
 
         this.scene.add(this.dirLight);
@@ -133,6 +130,10 @@ class SceneSetup {
         if (this.renderer && this.scene && this.camera) {
             // PERFORMANCE-HINWEIS: Frustum Culling ist automatisch aktiviert
             // THREE.js rendert nur Objekte, die im Kamera-Sichtfeld sind
+            if (this.renderer.shadowMap && this.renderer.shadowMap.autoUpdate === false) {
+                this.shadowUpdateFrame = (this.shadowUpdateFrame + 1) % 2;
+                this.renderer.shadowMap.needsUpdate = this.shadowUpdateFrame === 0;
+            }
             this.renderer.render(this.scene, this.camera);
         }
     }

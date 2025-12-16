@@ -2310,9 +2310,11 @@ export class UIManager {
             if (isLoss) coin.classList.add('loss');
 
             document.body.appendChild(coin);
-            
-            coin.style.left = startX + 'px';
-            coin.style.top = startY + 'px';
+
+            // OPTIMIERUNG: GPU-beschleunigte Positionierung mit translate3d
+            coin.style.left = '0px';
+            coin.style.top = '0px';
+            coin.style.transform = `translate3d(${startX}px, ${startY}px, 0)`;
 
             const delay = i * 60;
             const duration = 1000 + Math.random() * 300;
@@ -2390,8 +2392,10 @@ export class UIManager {
                     el.style.display = 'none';
                 } else {
                     el.style.display = 'block';
-                    el.style.left = `${x}px`;
-                    el.style.top = `${y}px`;
+                    // OPTIMIERUNG: GPU-beschleunigte Positionierung mit translate3d
+                    el.style.left = '0px';
+                    el.style.top = '0px';
+                    el.style.transform = `translate3d(${x}px, ${y}px, 0)`;
                 }
             }
 
@@ -2720,8 +2724,10 @@ export class UIManager {
         const el = document.createElement('div');
         el.className = className;
         el.textContent = text;
-        el.style.left = `${x}px`;
-        el.style.top = `${y}px`;
+        // OPTIMIERUNG: GPU-beschleunigte Positionierung mit translate3d
+        el.style.left = '0px';
+        el.style.top = '0px';
+        el.style.transform = `translate3d(${x}px, ${y}px, 0)`;
         el.style.color = color;
 
         this.elements.uiLayer.appendChild(el);

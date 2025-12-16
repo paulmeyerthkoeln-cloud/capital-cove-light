@@ -42,7 +42,6 @@ class Person {
         this.walkSpeed = 4 + Math.random() * 2;
         this.insideTimer = 0;
         this.waitTimer = 0;
-        this._tempVec = new THREE.Vector3(); // Reusable helper to avoid per-frame allocations
     }
 
     init() {
@@ -55,7 +54,7 @@ class Person {
 
         const body = new THREE.Mesh(
             new THREE.BoxGeometry(1.6, 2.6, 1.1),
-            new THREE.MeshLambertMaterial({ color: bodyColor, flatShading: true })
+            new THREE.MeshStandardMaterial({ color: bodyColor, flatShading: true })
         );
         body.position.y = 2.4;
         body.castShadow = true;
@@ -63,50 +62,50 @@ class Person {
 
         const head = new THREE.Mesh(
             new THREE.BoxGeometry(1.2, 1.2, 1.2),
-            new THREE.MeshLambertMaterial({ color: skinColor, flatShading: true })
+            new THREE.MeshStandardMaterial({ color: skinColor, flatShading: true })
         );
         head.position.set(0, 2.4, 0);
-        head.castShadow = false;
+        head.castShadow = true;
         body.add(head);
 
         const armGeo = new THREE.BoxGeometry(0.5, 1.2, 0.6);
         this.leftArmPivot = new THREE.Group();
         this.leftArmPivot.position.set(-1.1, 1.8, 0);
-        const leftArm = new THREE.Mesh(armGeo, new THREE.MeshLambertMaterial({ color: bodyColor, flatShading: true }));
+        const leftArm = new THREE.Mesh(armGeo, new THREE.MeshStandardMaterial({ color: bodyColor, flatShading: true }));
         leftArm.position.y = -0.6;
-        leftArm.castShadow = false;
+        leftArm.castShadow = true;
         this.leftArmPivot.add(leftArm);
         body.add(this.leftArmPivot);
 
         this.rightArmPivot = new THREE.Group();
         this.rightArmPivot.position.set(1.1, 1.8, 0);
-        const rightArm = new THREE.Mesh(armGeo, new THREE.MeshLambertMaterial({ color: bodyColor, flatShading: true }));
+        const rightArm = new THREE.Mesh(armGeo, new THREE.MeshStandardMaterial({ color: bodyColor, flatShading: true }));
         rightArm.position.y = -0.6;
-        rightArm.castShadow = false;
+        rightArm.castShadow = true;
         this.rightArmPivot.add(rightArm);
         body.add(this.rightArmPivot);
 
         const legGeo = new THREE.BoxGeometry(0.6, 1.8, 0.7);
         this.leftLegPivot = new THREE.Group();
         this.leftLegPivot.position.set(-0.4, 0.9, 0);
-        const leftLeg = new THREE.Mesh(legGeo, new THREE.MeshLambertMaterial({ color: legColor, flatShading: true }));
+        const leftLeg = new THREE.Mesh(legGeo, new THREE.MeshStandardMaterial({ color: legColor, flatShading: true }));
         leftLeg.position.y = -0.9;
-        leftLeg.castShadow = false;
+        leftLeg.castShadow = true;
         this.leftLegPivot.add(leftLeg);
         group.add(this.leftLegPivot);
 
         this.rightLegPivot = new THREE.Group();
         this.rightLegPivot.position.set(0.4, 0.9, 0);
-        const rightLeg = new THREE.Mesh(legGeo, new THREE.MeshLambertMaterial({ color: legColor, flatShading: true }));
+        const rightLeg = new THREE.Mesh(legGeo, new THREE.MeshStandardMaterial({ color: legColor, flatShading: true }));
         rightLeg.position.y = -0.9;
-        rightLeg.castShadow = false;
+        rightLeg.castShadow = true;
         this.rightLegPivot.add(rightLeg);
         group.add(this.rightLegPivot);
 
         // Optional crate for market runners
         this.crate = new THREE.Mesh(
             new THREE.BoxGeometry(0.9, 0.9, 0.9),
-            new THREE.MeshLambertMaterial({ color: 0xb08a63, flatShading: true })
+            new THREE.MeshStandardMaterial({ color: 0xb08a63, flatShading: true })
         );
         this.crate.position.set(0.2, -1.0, 0.8);
         this.crate.visible = false;
@@ -155,7 +154,7 @@ class Person {
             const current = this.mesh.position;
             const dist = current.distanceTo(target);
 
-            const dir = this._tempVec.subVectors(target, current).normalize();
+            const dir = new THREE.Vector3().subVectors(target, current).normalize();
             this.mesh.position.add(dir.multiplyScalar(this.walkSpeed * dt));
             this.mesh.position.y = this.getGroundHeight(this.mesh.position.x, this.mesh.position.z);
             this.mesh.lookAt(target.x, this.mesh.position.y, target.z);

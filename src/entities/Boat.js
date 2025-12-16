@@ -66,7 +66,6 @@ class Boat {
         this.upgradeDuration = 25.0; // 25 Sekunden Bearbeitungszeit
         this.waitingForCratesTimer = 0;
         this.upgradePhase = 0;
-        this._navDir = new THREE.Vector3(); // Reusable helper to avoid per-frame allocations
     }
 
     init() {
@@ -106,7 +105,7 @@ class Boat {
         const outlineMat = new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.BackSide });
 
         // 1. Schaft (Zylinder)
-        const shaftGeo = new THREE.CylinderGeometry(0.4, 0.4, 2.5, 5);
+        const shaftGeo = new THREE.CylinderGeometry(0.4, 0.4, 2.5, 8);
         const shaft = new THREE.Mesh(shaftGeo, mat);
         shaft.position.y = 1.5; // Nach oben schieben
         this.hintMesh.add(shaft);
@@ -181,7 +180,7 @@ class Boat {
         if (!this.mesh) return;
 
         const geo = new THREE.BoxGeometry(1.0, 0.6, 0.8);
-        const mat = new THREE.MeshLambertMaterial({ color: 0x8d6e63, flatShading: true });
+        const mat = new THREE.MeshStandardMaterial({ color: 0x8d6e63, flatShading: true });
         const mesh = new THREE.Mesh(geo, mat);
 
         const x = (Math.random() - 0.5) * 2.5;
@@ -428,8 +427,8 @@ class Boat {
 
         if (dist < 2.0) return true;
 
-        const direction = this._navDir.subVectors(target, current).normalize();
-        this.mesh.position.addScaledVector(direction, speed * dt);
+        const direction = new THREE.Vector3().subVectors(target, current).normalize();
+        this.mesh.position.add(direction.multiplyScalar(speed * dt));
         // Safety: Stelle sicher, dass das Boot im Wasserbereich bleibt
         this.mesh.position.x = THREE.MathUtils.clamp(this.mesh.position.x, -SEA_BOUND_X, SEA_BOUND_X);
         this.mesh.position.z = THREE.MathUtils.clamp(this.mesh.position.z, DOCK_Z, SEA_BOUND_Z);
@@ -592,7 +591,8 @@ class Boat {
             return;
         }
 
-        const interval = (this.type === 'row') ? 0.6 : 0.35;
+        // OPTIMIERUNG: Weniger Partikel für Tablets
+        const interval = (this.type === 'row') ? 0.8 : 0.6;
         this.wakeTimer += dt;
 
         if (this.wakeTimer >= interval) {
@@ -632,9 +632,8 @@ class Boat {
 
         sceneSetup.scene.add(mesh);
 
-        // Simple animation logic handled in BoatManager or a separate particle manager
-        // For simplicity, let's attach a "life" property to the mesh
-        mesh.userData = { life: 1.0 };
+        // OPTIMIERUNG: Kürzere Lebensdauer für Tablets (weniger gleichzeitige Partikel)
+        mesh.userData = { life: 0.8 };
         if (!this.wakeParticles) this.wakeParticles = [];
         this.wakeParticles.push(mesh);
     }
@@ -680,7 +679,7 @@ class Boat {
 
     buildMotorBoat() {
         // --- Materialien initialisieren ---
-        const mat = (col, rough = 0.8) => new THREE.MeshLambertMaterial({
+        const mat = (col, rough = 0.8) => new THREE.MeshStandardMaterial({
             color: col, flatShading: true, roughness: rough
         });
 
@@ -706,10 +705,10 @@ class Boat {
             rust: mat(colors.rust),
             tire: mat(colors.tire),
             rope: mat(colors.rope),
-            lanternGlow: new THREE.MeshLambertMaterial({
+            lanternGlow: new THREE.MeshStandardMaterial({
                 color: 0xffffaa, emissive: 0xff9900, emissiveIntensity: 2
             }),
-            flag: new THREE.MeshLambertMaterial({
+            flag: new THREE.MeshStandardMaterial({
                 color: 0xff3333, side: THREE.DoubleSide, flatShading: true
             })
         };
@@ -750,7 +749,7 @@ class Boat {
         stripeGeo.computeVertexNormals();
         const stripe = new THREE.Mesh(stripeGeo, materials.stripe);
         stripe.position.y = 1.35;
-        stripe.castShadow = false;
+        stripe.castShadow = true;
         this.meshContainer.add(stripe);
 
         // === DECK ===
@@ -780,10 +779,10 @@ class Boat {
         this.meshContainer.add(roof);
 
         // === AUSPUFF ===
-        const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 2, 5), materials.rust);
+        const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 2), materials.rust);
         pipe.position.set(0.8, 4, -1.8);
         pipe.rotation.set(-0.1, 0, -0.1);
-        pipe.castShadow = false;
+        pipe.castShadow = true;
         this.meshContainer.add(pipe);
 
         // Rauchsystem
@@ -806,21 +805,21 @@ class Boat {
         // === WINDE ===
         const winchBase = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.8, 0.8), materials.rust);
         winchBase.position.set(0, 1.8, -3);
-        winchBase.castShadow = false;
+        winchBase.castShadow = true;
         this.meshContainer.add(winchBase);
 
-        const winchDrum = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 1.2, 6), materials.rope);
+        const winchDrum = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 1.2, 12), materials.rope);
         winchDrum.rotation.z = Math.PI / 2;
         winchDrum.position.set(0, 2.1, -3);
         this.meshContainer.add(winchDrum);
 
         // === MAST ===
-        const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.2, 5, 5), materials.roof);
+        const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.2, 5, 8), materials.roof);
         mast.position.set(0, 4, 1.5);
-        mast.castShadow = false;
+        mast.castShadow = true;
         this.meshContainer.add(mast);
 
-        const cross = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 2.5, 5), materials.roof);
+        const cross = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 2.5), materials.roof);
         cross.rotation.z = Math.PI/2;
         cross.position.set(0, 5.5, 1.5);
         this.meshContainer.add(cross);
@@ -830,7 +829,7 @@ class Boat {
         this.lanternPivot.position.set(0.8, 5.5, 1.5);
         this.meshContainer.add(this.lanternPivot);
 
-        const lRope = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.5, 0.02), new THREE.MeshLambertMaterial({color:0x000000}));
+        const lRope = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.5, 0.02), new THREE.MeshStandardMaterial({color:0x000000}));
         lRope.position.y = -0.25;
         this.lanternPivot.add(lRope);
 
@@ -844,7 +843,7 @@ class Boat {
         lantern.add(light);
 
         // === FLAGGE ===
-        const flagPole = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.5, 4), materials.roof);
+        const flagPole = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.5), materials.roof);
         flagPole.position.set(0, 6.5, 1.5);
         this.meshContainer.add(flagPole);
 
@@ -855,15 +854,16 @@ class Boat {
 
         // === DREDGE NET VISUAL (Schleppnetz Upgrade) ===
         // Ein aufgerolltes, schweres Netz am Heck hinter der Winde
-        const netGeo = new THREE.CylinderGeometry(0.6, 0.6, 1.8, 5);
-        const netMat = new THREE.MeshLambertMaterial({
-            color: 0x3E2723, // Dunkelbraun/Schlammig,
+        const netGeo = new THREE.CylinderGeometry(0.6, 0.6, 1.8, 8);
+        const netMat = new THREE.MeshStandardMaterial({
+            color: 0x3E2723, // Dunkelbraun/Schlammig
+            roughness: 1.0,
             flatShading: true
         });
         this.netMesh = new THREE.Mesh(netGeo, netMat);
         this.netMesh.rotation.z = Math.PI / 2;
         this.netMesh.position.set(0, 2.0, -4.2); // Am Heck positioniert
-        this.netMesh.castShadow = false;
+        this.netMesh.castShadow = true;
         this.netMesh.visible = false; // Standardmäßig unsichtbar
         this.meshContainer.add(this.netMesh);
     }
@@ -884,15 +884,15 @@ class Boat {
 
         // --- MATERIALIEN ---
         const mat = {
-            hullRed: new THREE.MeshLambertMaterial({ color: colors.hullRed, flatShading: true }),
-            hullGrey: new THREE.MeshLambertMaterial({ color: colors.hullGrey, flatShading: true }),
-            deck: new THREE.MeshLambertMaterial({ color: colors.deckGrey, flatShading: true }),
-            super: new THREE.MeshLambertMaterial({ color: colors.superstruct, flatShading: true }),
-            metal: new THREE.MeshLambertMaterial({ color: colors.metalDark, flatShading: true }),
-            hazard: new THREE.MeshLambertMaterial({ color: colors.hazard, flatShading: true }),
-            glass: new THREE.MeshLambertMaterial({ color: colors.glass, flatShading: true, emissive: colors.glass, emissiveIntensity: 0.1 }),
-            net: new THREE.MeshLambertMaterial({ color: colors.net, flatShading: true, wireframe: false }),
-            rust: new THREE.MeshLambertMaterial({ color: colors.rust, flatShading: true })
+            hullRed: new THREE.MeshStandardMaterial({ color: colors.hullRed, flatShading: true, roughness: 0.8 }),
+            hullGrey: new THREE.MeshStandardMaterial({ color: colors.hullGrey, flatShading: true, roughness: 0.7 }),
+            deck: new THREE.MeshStandardMaterial({ color: colors.deckGrey, flatShading: true, roughness: 0.9 }),
+            super: new THREE.MeshStandardMaterial({ color: colors.superstruct, flatShading: true, roughness: 0.6 }),
+            metal: new THREE.MeshStandardMaterial({ color: colors.metalDark, flatShading: true, metalness: 0.5, roughness: 0.5 }),
+            hazard: new THREE.MeshStandardMaterial({ color: colors.hazard, flatShading: true }),
+            glass: new THREE.MeshStandardMaterial({ color: colors.glass, flatShading: true, metalness: 0.9, roughness: 0.1, emissive: colors.glass, emissiveIntensity: 0.1 }),
+            net: new THREE.MeshStandardMaterial({ color: colors.net, flatShading: true, wireframe: false }),
+            rust: new THREE.MeshStandardMaterial({ color: colors.rust, flatShading: true })
         };
 
         const trawler = new THREE.Group();
@@ -1000,10 +1000,10 @@ class Boat {
         superGroup.add(windowBand);
 
         // Schornsteine (Doppelt, massiv)
-        const stackGeo = new THREE.CylinderGeometry(0.4, 0.5, 2.5, 5);
+        const stackGeo = new THREE.CylinderGeometry(0.4, 0.5, 2.5, 8);
         const stack1 = new THREE.Mesh(stackGeo, mat.hullGrey);
         stack1.position.set(-1, 4, -1.5);
-        stack1.castShadow = false;
+        stack1.castShadow = true;
         superGroup.add(stack1);
 
         const stack2 = stack1.clone();
@@ -1020,7 +1020,7 @@ class Boat {
 
         // Rettungsinseln
         for(let i=0; i<4; i++) {
-            const raft = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 0.6, 5), mat.super);
+            const raft = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 0.6, 8), mat.super);
             raft.rotation.z = Math.PI/2;
             raft.position.set(i%2===0 ? -1.6 : 1.6, 4.5, 0.8 + (i<2?-0.4:0.4));
             superGroup.add(raft);
@@ -1064,9 +1064,8 @@ class Boat {
         function createWinch(xPos) {
             const grp = new THREE.Group();
             grp.position.set(xPos, 0, 0);
-            const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 1.2, 6), mat.metal);
-            drum.rotation.z = Math.PI/2; 
-            grp.add(drum);
+            const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 1.2, 12), mat.metal);
+            drum.rotation.z = Math.PI/2; drum.castShadow = true; grp.add(drum);
             const motor = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.8, 1.2), mat.hazard);
             motor.position.set(0, -0.2, 0.8); grp.add(motor);
             return grp;
@@ -1078,9 +1077,8 @@ class Boat {
         // Kran (Vorne)
         const craneGroup = new THREE.Group();
         craneGroup.position.set(2, 2.5, 3);
-        const craneBase = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.5, 1.2, 5), mat.hazard);
-        craneBase.position.y = 0.6; 
-        craneGroup.add(craneBase);
+        const craneBase = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.5, 1.2, 8), mat.hazard);
+        craneBase.position.y = 0.6; craneGroup.add(craneBase);
         const craneArm1 = new THREE.Mesh(new THREE.BoxGeometry(0.4, 2.5, 0.4), mat.hazard);
         craneArm1.position.set(0, 1.6, 0); craneArm1.rotation.x = -0.4; craneBase.add(craneArm1);
         trawler.add(craneGroup);
@@ -1115,7 +1113,7 @@ class Boat {
     createSmokeSystem(x, y, z) {
         this.smokeGroup = new THREE.Group();
         const smokeGeo = new THREE.DodecahedronGeometry(0.5, 0);
-        const smokeMat = new THREE.MeshLambertMaterial({ color: 0xBBDEFB, transparent: true, opacity: 0.6, flatShading: true });
+        const smokeMat = new THREE.MeshStandardMaterial({ color: 0xBBDEFB, transparent: true, opacity: 0.6, flatShading: true });
         
         for(let i=0; i<6; i++) {
             const s = new THREE.Mesh(smokeGeo, smokeMat.clone());
@@ -1355,7 +1353,7 @@ export class BoatManager {
 
         // Viele Low-Poly Kugeln (Icosahedron)
         const geo = new THREE.IcosahedronGeometry(1, 0);
-        const mat = new THREE.MeshLambertMaterial({
+        const mat = new THREE.MeshStandardMaterial({
             color: 0xDDDDDD,
             transparent: true,
             opacity: 0.9,

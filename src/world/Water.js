@@ -2,12 +2,11 @@ import * as THREE from 'three';
 import { sceneSetup } from '../core/SceneSetup.js';
 import { events, EVENTS, DIRECTOR_EVENTS } from '../core/Events.js';
 
-// OPTIMIERUNG für Tab A 2016 (Mali-T830 MP1 GPU):
-// Der alte Fragment-Shader berechnete per-Pixel Simplex Noise - EXTREM teuer!
-// Neue Strategie: Alle Berechnungen (Wellen, Farben) im VERTEX-Shader.
-// Der Fragment-Shader macht fast nichts mehr -> Massive Performance-Steigerung.
+// PERFORMANCE-OPTIMIERUNG:
+// Die schwere Arbeit (Noise-Berechnungen) wurde in den Vertex Shader verschoben.
+// Der Fragment Shader macht nur noch Farben mischen und Normalen berechnen (für Low-Poly Look).
+// Das spart Millionen Rechenoperationen pro Frame.
 
-// Noise Funktion (nur noch im Vertex Shader genutzt)
 const noiseFunction = `
     vec3 permute(vec3 x) { return mod(((x*34.0)+1.0)*x, 289.0); }
     float snoise(vec2 v){
@@ -39,56 +38,89 @@ const noiseFunction = `
 
 const vertexShader = `
     uniform float uTime;
-
-    // Farben direkt im Vertex Shader mischen!
-    uniform vec3 uColorDeep;
-    uniform vec3 uColorShallow;
-    uniform vec3 uColorFoam;
-
-    varying vec3 vColor; // Wir übergeben nur die fertige Farbe an den Fragment Shader
+    varying float vElevation;
+    varying vec3 vPosition;
+    varying float vDist;
+    // vFoam entfernt, da wir es pixelgenau berechnen müssen
 
     ${noiseFunction}
 
     void main() {
         vec3 pos = position;
         float dist = length(pos.xy);
+        vDist = dist;
 
-        // Geometrie verformen (Wellen)
+        float sinkMask = smoothstep(130.0, 155.0, dist);
+        float depthOffset = -15.0 * (1.0 - sinkMask);
+
         float waveMask = smoothstep(140.0, 300.0, dist);
         float waveStrength = mix(0.0, 1.0, waveMask);
 
-        // Einfachere Sinus-Wellen + ein einziger Noise-Call (statt mehrere im Fragment-Shader!)
-        float bigWave = sin(pos.x * 0.05 + uTime * 0.8) * sin(pos.y * 0.05 + uTime * 0.6);
-        float detailWave = snoise(vec2(pos.x * 0.03, pos.y * 0.03 + uTime * 0.2)); // Noise nur 1x
+        // Noise Berechnung (teuer) bleibt im Vertex Shader (billig, da weniger Vertices als Pixel)
+        float elevation = sin(pos.x * 0.02 + uTime * 0.5) * sin(pos.y * 0.02 + uTime * 0.4) * 1.5;
+        elevation += snoise(vec2(pos.x * 0.03 + uTime * 0.3, pos.y * 0.03 + uTime * 0.2)) * 1.5;
 
-        float elevation = (bigWave + detailWave) * 1.5 * waveStrength;
+        elevation *= waveStrength;
+        pos.z += elevation + depthOffset;
 
-        // Insel absenken
-        float sinkMask = smoothstep(130.0, 155.0, dist);
-        pos.z += elevation - (15.0 * (1.0 - sinkMask));
-
-        // FARBBERECHNUNG (Vertex-Level = Billig & Schnell)
-        float lagoonFactor = 1.0 - smoothstep(140.0, 300.0, dist);
-
-        // Basis-Mix (Tief -> Flach)
-        vec3 col = mix(uColorDeep, uColorShallow, lagoonFactor);
-
-        // Schaum auf Wellenspitzen
-        float foamFactor = smoothstep(0.5, 1.2, elevation);
-        col = mix(col, uColorFoam, foamFactor * 0.5);
-
-        vColor = col;
+        vElevation = elevation;
+        vPosition = pos;
 
         gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
     }
 `;
 
-// Der Fragment Shader macht jetzt fast NICHTS mehr -> Maximale Performance
 const fragmentShader = `
-    varying vec3 vColor;
+    uniform float uTime;
+    uniform vec3 uColorDeep;
+    uniform vec3 uColorShallow;
+    uniform vec3 uColorFoam;
+    uniform vec3 uSunDirection;
+
+    varying float vElevation;
+    varying vec3 vPosition;
+    varying float vDist;
 
     void main() {
-        gl_FragColor = vec4(vColor, 0.95);
+        // 1. Low Poly Look (Erhält die kristalline Optik)
+        vec3 fNormal = normalize(cross(dFdx(vPosition), dFdy(vPosition)));
+        vec3 lightDir = normalize(uSunDirection);
+        float light = max(dot(fNormal, lightDir), 0.0);
+        float shadow = mix(0.6, 1.0, light);
+
+        // 2. Wasserfarbe
+        float lagoonFactor = 1.0 - smoothstep(130.0, 300.0, vDist);
+        vec3 col = mix(uColorDeep, uColorShallow, lagoonFactor);
+
+        // 3. BRANDUNG (Der performante Trick)
+        // Statt Noise nutzen wir billige Sinus-Verzerrung basierend auf der Position (vPosition.x/z).
+        // Das bricht die perfekte Kreisform auf.
+        float distortion = sin(vPosition.x * 0.1 + uTime) * 2.0 + cos(vPosition.y * 0.1 + uTime) * 2.0;
+
+        // Wir addieren die Verzerrung zur Distanz
+        float dist = vDist + distortion;
+
+        // Wandernde Ringe (Sinus über Zeit) - zur Insel hin (+ statt -)
+        float waveCycle = sin(dist * 0.5 + uTime * 2.5);
+
+        // Harte Kanten für den Comic-Look (step Funktion ist extrem billig)
+        float foamLines = step(0.4, waveCycle);
+
+        // Maskierung: Schaum nur in Strandnähe (Radius 120 bis 160)
+        // Wir subtrahieren vElevation, damit der Schaum mit den Wellen "schwappt"
+        float shoreMask = smoothstep(120.0, 130.0, dist - vElevation * 2.0) * (1.0 - smoothstep(150.0, 160.0, dist));
+
+        float isSurf = foamLines * shoreMask;
+
+        // 4. Glanzlichter
+        float highlight = smoothstep(0.95, 1.0, light);
+
+        // Zusammenfügen
+        col = mix(col, uColorFoam, highlight * 0.3); // Glanz
+        col = mix(col, uColorFoam, isSurf);          // Schaum
+        col *= shadow;                               // Schatten
+
+        gl_FragColor = vec4(col, 0.95);
     }
 `;
 
@@ -104,9 +136,14 @@ export class Water {
         };
 
         this.colorsDead = {
-            deep: new THREE.Color('#2F3E30'),    // Sumpfiges Dunkelgrün
-            shallow: new THREE.Color('#8B8560'), // Trübes Braun-Gelb
-            foam: new THREE.Color('#C2B280')     // Dreckiger Schaum
+            // Sumpfiges, öliges Dunkelgrün statt Schwarz
+            deep: new THREE.Color('#2F3E30'),    
+            
+            // Trübes, schlammiges Braun-Gelb (aufgewühlter Sand)
+            shallow: new THREE.Color('#8B8560'), 
+            
+            // Dreckiger, gelblicher Schaum
+            foam: new THREE.Color('#C2B280')     
         };
 
         this.currentHealth = 1.0;
@@ -120,8 +157,8 @@ export class Water {
     }
 
     init() {
-        // OPTIMIERUNG (Tab A 2016): 48x48 Segmente reichen für Wellen auf kleinem Bildschirm
-        const geometry = new THREE.PlaneGeometry(1000, 1000, 48, 48);
+        // OPTIMIERUNG: 96 Segmente für bessere Brandungs-Darstellung (Kompromiss Performance/Optik)
+        const geometry = new THREE.PlaneGeometry(1000, 1000, 96, 96);
 
         this.material = new THREE.ShaderMaterial({
             vertexShader: vertexShader,
@@ -130,11 +167,20 @@ export class Water {
                 uTime: { value: 0 },
                 uColorDeep: { value: this.uniformColors.deep },
                 uColorShallow: { value: this.uniformColors.shallow },
-                uColorFoam: { value: this.uniformColors.foam }
-                // SunDirection entfernt, da wir im VertexShader kein Licht berechnen
+                uColorFoam: { value: this.uniformColors.foam },
+                uSunDirection: { value: new THREE.Vector3(1, 1, 1) }
             },
-            transparent: true
+            transparent: true,
+            side: THREE.DoubleSide,
+            flatShading: true, // WICHTIG für den Look
+            extensions: {
+                derivatives: true // WICHTIG für dFdx/dFdy
+            }
         });
+
+        if (sceneSetup && sceneSetup.sunDirection) {
+            this.material.uniforms.uSunDirection.value = sceneSetup.sunDirection;
+        }
 
         this.mesh = new THREE.Mesh(geometry, this.material);
         this.mesh.rotation.x = -Math.PI / 2;
@@ -146,8 +192,13 @@ export class Water {
 
         // Listener: Wasserqualität hängt direkt am Fischbestand
         events.on(EVENTS.STATS_UPDATED, (stats) => {
+            // Verhältnis berechnen (1.0 = voll/sauber, 0.0 = leer/dreckig)
             let ratio = stats.fishStock / stats.maxFishStock;
-            this.targetHealth = Math.max(0, Math.min(1, ratio));
+
+            // Begrenzung
+            ratio = Math.max(0, Math.min(1, ratio));
+
+            this.targetHealth = ratio;
         });
 
         events.on(DIRECTOR_EVENTS.PHASE_CHANGED, (data) => {
@@ -159,9 +210,10 @@ export class Water {
 
     update(time) {
         if (!this.material) return;
+
         this.material.uniforms.uTime.value = time;
 
-        // Sehr langsame, fließende Anpassung der Farbe
+        // Sehr langsame, fließende Anpassung der Farbe (kein Pulsieren)
         const lerpSpeed = 0.005;
         this.currentHealth += (this.targetHealth - this.currentHealth) * lerpSpeed;
 

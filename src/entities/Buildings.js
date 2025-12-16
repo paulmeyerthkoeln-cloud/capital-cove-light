@@ -5,8 +5,6 @@ import { sceneSetup } from '../core/SceneSetup.js';
 import { events, EVENTS, DIRECTOR_EVENTS, ECON_EVENTS } from '../core/Events.js';
 import { game } from '../core/Game.js';
 import { economy } from '../logic/Economy.js';
-// OPTIMIERUNG (Tab A 2016): Geometry Merging für statische Objekte
-import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 
 // PERFORMANCE-HINWEIS für Tablets:
 // Die Partikel-Arrays (particles, props) wachsen während des Spiels.
@@ -18,7 +16,7 @@ export class BuildingManager {
     constructor() {
         this.buildings = [];
         this.particles = [];
-        this.props = [];
+        this.props = []; 
 
         this.bankGroup = null;
         this.tentGroup = null;
@@ -27,7 +25,7 @@ export class BuildingManager {
         this.hqGroup = null;
         this.hqSmokeGroup = null;
         this.tavernSmokeGroup = null;
-        this.shipyardSparks = null;
+        this.shipyardSparks = null; 
 
         this.tavernLights = null;
         this.lanternLights = [];
@@ -40,9 +38,9 @@ export class BuildingManager {
         this.bankCoin = null;
         this.bankOrigin = new THREE.Vector3();
         this.flowIntensity = 1.0;
-        this.hints = new Map();
-        this.shakingBuildings = new Map();
-        this.activeFlashs = new Map();
+        this.hints = new Map(); 
+        this.shakingBuildings = new Map(); 
+        this.activeFlashs = new Map(); 
 
         this.isPartyMode = false;
         this.isCollapsed = false;
@@ -58,71 +56,6 @@ export class BuildingManager {
             timer: 0,
             scaffold: null,
             dustCloud: null
-        };
-
-        // OPTIMIERUNG (Tab A 2016): Zentrale Material-Bibliothek
-        // Erstelle alle Materialien EINMALIG hier statt in jeder Funktion neu
-        // -> Reduziert Draw Calls und GPU State Changes massiv
-        this.mats = {
-            // Holz
-            wood: new THREE.MeshLambertMaterial({ color: 0x8d6e63, flatShading: true }),
-            woodDark: new THREE.MeshLambertMaterial({ color: 0x5D4037, flatShading: true }),
-            woodLight: new THREE.MeshLambertMaterial({ color: 0xa97455, flatShading: true }),
-            woodReddish: new THREE.MeshLambertMaterial({ color: 0x6D4C41, flatShading: true }),
-            woodPale: new THREE.MeshLambertMaterial({ color: 0xD7CCC8, flatShading: true }),
-
-            // Stein & Beton
-            stone: new THREE.MeshLambertMaterial({ color: 0xcfd8dc, flatShading: true }),
-            stoneDark: new THREE.MeshLambertMaterial({ color: 0x455a64, flatShading: true }),
-            stoneStep: new THREE.MeshLambertMaterial({ color: 0xb0bec5, flatShading: true }),
-
-            // Wände
-            wallBeige: new THREE.MeshLambertMaterial({ color: 0xf7e7d3, flatShading: true }),
-            wallCream: new THREE.MeshLambertMaterial({ color: 0xf2dfcc, flatShading: true }),
-
-            // Dächer
-            roofTurquoise: new THREE.MeshLambertMaterial({ color: 0x4ecdc4, flatShading: true }),
-            roofRed: new THREE.MeshLambertMaterial({ color: 0xb71c1c, flatShading: true }),
-            roofRedDark: new THREE.MeshLambertMaterial({ color: 0xa91a1a, flatShading: true }),
-
-            // Metall & Akzente
-            metal: new THREE.MeshLambertMaterial({ color: 0x78909C, flatShading: true }),
-            metalDark: new THREE.MeshLambertMaterial({ color: 0x7e8a94, flatShading: true }),
-            accentBlue: new THREE.MeshLambertMaterial({ color: 0x3c5a73, flatShading: true }),
-            accentBlueDark: new THREE.MeshLambertMaterial({ color: 0x32475b, flatShading: true }),
-            chain: new THREE.MeshLambertMaterial({ color: 0x3e4a54, flatShading: true }),
-
-            // Fenster & Glas
-            window: new THREE.MeshLambertMaterial({ color: 0x1f3b61, emissive: 0x0e1a2b, flatShading: true }),
-
-            // Gold & Glänzendes (Phong für Glanzlichter)
-            gold: new THREE.MeshPhongMaterial({ color: 0xffd54f, flatShading: true, shininess: 30 }),
-            goldCoin: new THREE.MeshPhongMaterial({ color: 0xFFD700, flatShading: true, shininess: 60 }),
-
-            // Farben & Textilien
-            canvas: new THREE.MeshLambertMaterial({ color: 0xF5F5DC, flatShading: true }),
-            tarp: new THREE.MeshLambertMaterial({ color: 0x4ecdc4, flatShading: true }),
-            orange: new THREE.MeshLambertMaterial({ color: 0xffb74d, flatShading: true }),
-            yellow: new THREE.MeshLambertMaterial({ color: 0xFFC107, flatShading: true }),
-
-            // Fisch & Essen
-            fish: new THREE.MeshLambertMaterial({ color: 0xf4a261, flatShading: true }),
-            crate: new THREE.MeshLambertMaterial({ color: 0xb08a63, flatShading: true }),
-            barrel: new THREE.MeshLambertMaterial({ color: 0x5d4037, flatShading: true }),
-
-            // Emissive (Selbstleuchtend)
-            lanternGlow: new THREE.MeshLambertMaterial({ color: 0xffd966, emissive: 0xffc107, emissiveIntensity: 1.4, flatShading: true }),
-            mugGlow: new THREE.MeshLambertMaterial({ color: 0xffc107, emissive: 0xffd54f, emissiveIntensity: 0.2, flatShading: true }),
-
-            // Partikel & Effekte
-            smoke: new THREE.MeshLambertMaterial({ color: 0xe8edf2, transparent: true, opacity: 0.7, flatShading: true }),
-            smokeDark: new THREE.MeshLambertMaterial({ color: 0xe8edf2, transparent: true, opacity: 0.5, flatShading: true }),
-            dust: new THREE.MeshLambertMaterial({ color: 0xDDDDDD, transparent: true, opacity: 0.9, flatShading: true }),
-            puff: new THREE.MeshLambertMaterial({ color: 0x95a5a6, transparent: true, opacity: 0.85, flatShading: true }),
-            foam: new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true }),
-
-            // Sonstiges
-            stool: new THREE.MeshLambertMaterial({ color: 0x7b4a2e, flatShading: true })
         };
     }
 
@@ -326,15 +259,17 @@ export class BuildingManager {
         if(!start || !end) return;
 
         const bagGeo = new THREE.DodecahedronGeometry(3.5, 1);
-        const bagMat = new THREE.MeshLambertMaterial({
+        const bagMat = new THREE.MeshStandardMaterial({
             color: 0xFFD700,
+            roughness: 0.3,
+            metalness: 0.8,
             emissive: 0xffaa00,
             emissiveIntensity: 0.4
         });
         const bag = new THREE.Mesh(bagGeo, bagMat);
         bag.position.copy(start);
         bag.position.y += 10;
-        bag.castShadow = false;
+        bag.castShadow = true;
         sceneSetup.scene.add(bag);
 
         this.particles.push({
@@ -402,19 +337,19 @@ export class BuildingManager {
         group.scale.set(0, 0, 0);
 
         if (type === 'wood_stack') {
-            const mat = new THREE.MeshLambertMaterial({ color: 0x8d6e63 });
+            const mat = new THREE.MeshStandardMaterial({ color: 0x8d6e63 });
             const box = new THREE.Mesh(new THREE.BoxGeometry(4, 2, 8), mat);
             box.position.y = 1;
-            box.castShadow = false;
+            box.castShadow = true;
             group.add(box);
             const box2 = new THREE.Mesh(new THREE.BoxGeometry(3, 2, 6), mat);
             box2.position.set(0, 3, 0);
-            box2.castShadow = false;
+            box2.castShadow = true;
             group.add(box2);
         }
         else if (type === 'barrel_stack') {
-            const mat = new THREE.MeshLambertMaterial({ color: 0x5d4037 });
-            const barrel = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 3, 6), mat);
+            const mat = new THREE.MeshStandardMaterial({ color: 0x5d4037 });
+            const barrel = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 3, 8), mat);
             barrel.rotation.z = Math.PI / 2;
             barrel.position.y = 1.5;
             group.add(barrel);
@@ -426,17 +361,17 @@ export class BuildingManager {
             group.add(b3);
         }
         else if (type === 'party_table') {
-            const matWood = new THREE.MeshLambertMaterial({ color: 0xD7CCC8 });
-            const table = new THREE.Mesh(new THREE.CylinderGeometry(3, 3, 0.5, 6), matWood);
+            const matWood = new THREE.MeshStandardMaterial({ color: 0xD7CCC8 });
+            const table = new THREE.Mesh(new THREE.CylinderGeometry(3, 3, 0.5, 10), matWood);
             table.position.y = 2.5;
-            table.castShadow = false;
+            table.castShadow = true;
             group.add(table);
-            const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 2.5, 5), matWood);
+            const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 2.5), matWood);
             leg.position.y = 1.25;
             group.add(leg);
 
             const mugGeo = new THREE.CylinderGeometry(0.4, 0.4, 0.8, 6);
-            const mugMat = new THREE.MeshLambertMaterial({ color: 0xFFC107 });
+            const mugMat = new THREE.MeshStandardMaterial({ color: 0xFFC107 });
             for(let i=0; i<3; i++) {
                 const mug = new THREE.Mesh(mugGeo, mugMat);
                 mug.position.set(Math.sin(i*2)*1.5, 3.0, Math.cos(i*2)*1.5);
@@ -444,11 +379,11 @@ export class BuildingManager {
             }
         }
         else if (type === 'pole') {
-            const mat = new THREE.MeshLambertMaterial({ color: 0x8d6e63 });
-            const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 10, 5), mat);
+            const mat = new THREE.MeshStandardMaterial({ color: 0x8d6e63 });
+            const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 10), mat);
             pole.position.y = 5;
             group.add(pole);
-            const bulb = new THREE.Mesh(new THREE.SphereGeometry(1, 6, 6), new THREE.MeshBasicMaterial({ color: 0xFFEB3B }));
+            const bulb = new THREE.Mesh(new THREE.SphereGeometry(1), new THREE.MeshBasicMaterial({ color: 0xFFEB3B }));
             bulb.position.y = 10;
             group.add(bulb);
         }
@@ -486,7 +421,7 @@ export class BuildingManager {
         const emissiveIntensity = options.emissiveIntensity ?? 0.5;
 
         const coinGeo = new THREE.CylinderGeometry(2.5, 2.5, 0.5, 6); 
-        const coinMat = new THREE.MeshLambertMaterial({ 
+        const coinMat = new THREE.MeshStandardMaterial({ 
             color: color, 
             metalness: metalness, 
             roughness: roughness,
@@ -520,8 +455,8 @@ export class BuildingManager {
     createClogParticle(startPos, endPos) {
         if (!startPos || !endPos) return;
         const mid = startPos.clone().lerp(endPos, 0.5);
-        const geo = new THREE.SphereGeometry(2, 6, 6);
-        const mat = new THREE.MeshLambertMaterial({ color: 0x95a5a6, transparent: true, opacity: 0.85 });
+        const geo = new THREE.IcosahedronGeometry(2, 0);
+        const mat = new THREE.MeshStandardMaterial({ color: 0x95a5a6, transparent: true, opacity: 0.85, roughness: 1.0, metalness: 0 });
         const puff = new THREE.Mesh(geo, mat);
         puff.position.copy(startPos);
         sceneSetup.scene.add(puff);
@@ -576,8 +511,9 @@ export class BuildingManager {
         const geo = new THREE.BoxGeometry(3.5, 2.0, 2.5); 
        
         const color = options.isReject ? 0xc0392b : options.color;
-        const mat = new THREE.MeshLambertMaterial({ 
-            color: color,
+        const mat = new THREE.MeshStandardMaterial({ 
+            color: color, 
+            roughness: 0.8,
             flatShading: true
         });
 
@@ -585,7 +521,7 @@ export class BuildingManager {
         mesh.position.copy(startPos);
         
         if (delay > 0) mesh.visible = false;
-        mesh.castShadow = false;
+        mesh.castShadow = true;
         
         sceneSetup.scene.add(mesh);
 
@@ -609,9 +545,12 @@ export class BuildingManager {
         const startZ = 160;
         const geo = new THREE.BoxGeometry(2.5, 2.0, 2.5);
         for (let i = 0; i < count; i++) {
-            const mat = new THREE.MeshLambertMaterial({
+            const mat = new THREE.MeshStandardMaterial({
                 color: 0x556B2F,
-                flatShading: true
+                roughness: 1.0,
+                flatShading: true,
+                transparent: true,
+                opacity: 1.0
             });
             const mesh = new THREE.Mesh(geo, mat);
             mesh.position.set(
@@ -620,7 +559,7 @@ export class BuildingManager {
                 startZ + (Math.random() * 20)
             );
             mesh.rotation.y = Math.random() * Math.PI * 2;
-            mesh.castShadow = false;
+            mesh.castShadow = true;
             sceneSetup.scene.add(mesh);
 
             this.particles.push({
@@ -771,7 +710,7 @@ export class BuildingManager {
         if (this.boomState.scaffold) return;
 
         const scaffold = new THREE.Group();
-        const mat = new THREE.MeshLambertMaterial({ color: 0x8d6e63 });
+        const mat = new THREE.MeshStandardMaterial({ color: 0x8d6e63 });
         
         const thickness = 0.6;
         const height = 14; 
@@ -829,12 +768,14 @@ export class BuildingManager {
 
 
     spawnWorkParticles(center, type) {
-        const count = type === 'SPARK' ? 5 : 2;
+        // OPTIMIERUNG: Funkenanzahl auf 2 reduziert für Tablets (GC-Entlastung)
+        const count = 2;
         const color = type === 'SPARK' ? 0xFFFF00 : 0x8D6E63;
-        const geo = new THREE.BoxGeometry(0.3, 0.3, 0.3); 
+        const particleGeo = new THREE.BoxGeometry(0.3, 0.3, 0.3);
+        const particleMat = new THREE.MeshBasicMaterial({ color: color });
 
         for(let i=0; i<count; i++) {
-            const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: color }));
+            const mesh = new THREE.Mesh(particleGeo, particleMat);
 
             mesh.position.copy(center).add(new THREE.Vector3(
                 (Math.random()-0.5)*10,
@@ -861,16 +802,17 @@ export class BuildingManager {
     }
 
     spawnCoinFlow(direction, intensity = 1.0) {
-        if (!this.coinsEnabled) return; 
+        if (!this.coinsEnabled) return;
         if (!this.hqGroup || !this.tavernGroup || !this.shipyardGroup) return;
 
-        const dropChance = Math.max(0.2, intensity);
+        // OPTIMIERUNG: dropChance auf 0.5 begrenzt für Tablets (GC-Entlastung)
+        const dropChance = Math.min(0.5, Math.max(0.2, intensity));
 
-        if (Math.random() > this.flowIntensity) return; 
-        if (Math.random() > dropChance) return; 
+        if (Math.random() > this.flowIntensity) return;
+        if (Math.random() > dropChance) return;
 
-        let coinCount = 1;
-        if (intensity >= 0.95) coinCount = 2; 
+        // OPTIMIERUNG: Maximal 1 Münze pro Flow (GC-Entlastung)
+        let coinCount = 1; 
         
         const standardOps = { speed: 0.15, scale: 1.0 };
         
@@ -1292,12 +1234,12 @@ export class BuildingManager {
             const hintMesh = new THREE.Group();
             const mat = new THREE.MeshBasicMaterial({ color: 0xffea00 });
 
-            const shaft = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 8, 5), mat);
+            const shaft = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 8, 8), mat);
             shaft.position.y = 5;
             shaft.userData.isHint = true;
             hintMesh.add(shaft);
 
-            const head = new THREE.Mesh(new THREE.ConeGeometry(4, 7, 5), mat);
+            const head = new THREE.Mesh(new THREE.ConeGeometry(4, 7, 8), mat);
             head.position.y = -2.0;
             head.rotation.x = Math.PI;
             head.userData.isHint = true;
@@ -1409,20 +1351,17 @@ export class BuildingManager {
     spawnConstructionDust(pos, colorHex, isBig = false) {
         if (!pos) return;
 
-        const activeDust = this.particles.filter(p => p.isDust).length;
-        if (activeDust >= 30) return;
-
-        const count = isBig ? 8 : 4;
-        const geo = new THREE.DodecahedronGeometry(1, 0);
+        // OPTIMIERUNG: Partikelanzahl reduziert für Tablets (GC-Entlastung)
+        const count = isBig ? 12 : 6;
+        const geo = new THREE.BoxGeometry(1.5, 1.5, 1.5); // Einfache Würfel reichen als Staubteilchen
+        const mat = new THREE.MeshStandardMaterial({
+            color: colorHex,
+            transparent: true,
+            opacity: 1.0,
+            flatShading: true
+        });
 
         for (let i = 0; i < count; i++) {
-            const mat = new THREE.MeshLambertMaterial({
-                color: colorHex,
-                transparent: true,
-                opacity: 1.0,
-                flatShading: true
-            });
-
             const mesh = new THREE.Mesh(geo, mat);
             const spread = isBig ? 20 : 15;
             const offsetX = (Math.random() - 0.5) * spread;
@@ -1441,7 +1380,7 @@ export class BuildingManager {
             this.particles.push({
                 mesh,
                 material: mesh.material,
-                life: isBig ? 1.6 : 0.9,
+                life: isBig ? 3.0 : 2.0,
                 isFlowCoin: false,
                 isDust: true,
                 velocity: new THREE.Vector3(0, 8 + Math.random() * 8, 0)
@@ -1499,7 +1438,7 @@ export class BuildingManager {
 
         if (this.tavernGroup) {
             const scaffoldGeo = new THREE.BoxGeometry(8, 12, 1);
-            const scaffoldMat = new THREE.MeshLambertMaterial({
+            const scaffoldMat = new THREE.MeshStandardMaterial({
                 color: 0x8d6e63,
                 wireframe: true,
                 transparent: true,
@@ -1558,7 +1497,7 @@ export class BuildingManager {
         spawnBuildDust();
 
         const scaffoldGeo = new THREE.BoxGeometry(8, 12, 3);
-        const scaffoldMat = new THREE.MeshLambertMaterial({
+        const scaffoldMat = new THREE.MeshStandardMaterial({
             color: 0x8B6F47,
             transparent: true,
             opacity: 0.6,
@@ -1630,7 +1569,7 @@ export class BuildingManager {
     }
 
     createFoundation(width, depth, height = 8, color = 0x555b66) {
-        const mat = new THREE.MeshLambertMaterial({ color, flatShading: true });
+        const mat = new THREE.MeshStandardMaterial({ color, flatShading: true, roughness: 0.9 });
         const foundation = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), mat);
         foundation.position.y = -height * 0.5; 
         foundation.castShadow = true;
@@ -1639,16 +1578,16 @@ export class BuildingManager {
     }
 
     createWindow(width, height, color = 0x1f3b61) {
-        const mat = new THREE.MeshLambertMaterial({ color, emissive: 0x0e1a2b, flatShading: true });
+        const mat = new THREE.MeshStandardMaterial({ color, emissive: 0x0e1a2b, flatShading: true });
         const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, 0.4), mat);
-        mesh.castShadow = false;
+        mesh.castShadow = true;
         return mesh;
     }
 
     createDoor(width, height, color = 0x8d6e63) {
-        const mat = new THREE.MeshLambertMaterial({ color, flatShading: true });
+        const mat = new THREE.MeshStandardMaterial({ color, flatShading: true });
         const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, 0.6), mat);
-        mesh.castShadow = false;
+        mesh.castShadow = true;
         return mesh;
     }
 
@@ -1673,10 +1612,10 @@ export class BuildingManager {
         group.scale.set(1.2, 1.2, 1.2);
         group.userData = { type: 'hq', name: 'Fischerhaus', isInteractable: true };
 
-        const wallMat = new THREE.MeshLambertMaterial({ color: 0xf7e7d3, flatShading: true });
-        const roofMat = new THREE.MeshLambertMaterial({ color: 0x4ecdc4, flatShading: true });
-        const woodMat = new THREE.MeshLambertMaterial({ color: 0x8d6e63, flatShading: true });
-        const accentMat = new THREE.MeshLambertMaterial({ color: 0x3c5a73, flatShading: true });
+        const wallMat = new THREE.MeshStandardMaterial({ color: 0xf7e7d3, flatShading: true });
+        const roofMat = new THREE.MeshStandardMaterial({ color: 0x4ecdc4, flatShading: true });
+        const woodMat = new THREE.MeshStandardMaterial({ color: 0x8d6e63, flatShading: true });
+        const accentMat = new THREE.MeshStandardMaterial({ color: 0x3c5a73, flatShading: true });
 
         const foundation = this.createFoundation(26, 28, 8, 0x4a5568);
         group.add(foundation);
@@ -1689,7 +1628,7 @@ export class BuildingManager {
         [[-11, 6, -7], [11, 6, -7], [-11, 6, 7], [11, 6, 7]].forEach(pos => {
             const beam = new THREE.Mesh(new THREE.BoxGeometry(2, 12, 2), woodMat);
             beam.position.set(pos[0], pos[1], pos[2]);
-            beam.castShadow = false;
+            beam.castShadow = true;
             group.add(beam);
         });
 
@@ -1699,16 +1638,16 @@ export class BuildingManager {
         roof.castShadow = true;
         group.add(roof);
 
-        const chimney = new THREE.Mesh(new THREE.BoxGeometry(3, 7, 3), new THREE.MeshLambertMaterial({ color: 0x6b7b83, flatShading: true }));
+        const chimney = new THREE.Mesh(new THREE.BoxGeometry(3, 7, 3), new THREE.MeshStandardMaterial({ color: 0x6b7b83, flatShading: true }));
         chimney.position.set(-6, 18, -3);
-        chimney.castShadow = false;
+        chimney.castShadow = true;
         group.add(chimney);
 
         this.hqSmokeGroup = new THREE.Group();
         for (let i = 0; i < 4; i++) {
             const puff = new THREE.Mesh(
                 new THREE.DodecahedronGeometry(1.3 + Math.random() * 0.4, 0),
-                new THREE.MeshLambertMaterial({ color: 0xe8edf2, transparent: true, opacity: 0.7, flatShading: true })
+                new THREE.MeshStandardMaterial({ color: 0xe8edf2, transparent: true, opacity: 0.7, flatShading: true })
             );
             puff.position.set(0, 0, 0);
             puff.castShadow = false;
@@ -1734,13 +1673,13 @@ export class BuildingManager {
 
         const porch = new THREE.Mesh(new THREE.BoxGeometry(16, 1, 8), woodMat);
         porch.position.set(0, 0.5, 10.5);
-        porch.castShadow = false;
+        porch.castShadow = true;
         group.add(porch);
 
         [[-7, 3, 6.5], [7, 3, 6.5], [-7, 3, 12.5], [7, 3, 12.5]].forEach(pos => {
             const post = new THREE.Mesh(new THREE.BoxGeometry(0.8, 6, 0.8), woodMat);
             post.position.set(pos[0], pos[1], pos[2]);
-            post.castShadow = false;
+            post.castShadow = true;
             group.add(post);
         });
 
@@ -1752,10 +1691,10 @@ export class BuildingManager {
         railBack.position.z = 6.5;
         group.add(railBack);
 
-        const awning = new THREE.Mesh(new THREE.BoxGeometry(16, 0.8, 6), new THREE.MeshLambertMaterial({ color: 0x3cb5a3, flatShading: true }));
+        const awning = new THREE.Mesh(new THREE.BoxGeometry(16, 0.8, 6), new THREE.MeshStandardMaterial({ color: 0x3cb5a3, flatShading: true }));
         awning.position.set(0, 8, 9);
         awning.rotation.x = -0.25;
-        awning.castShadow = false;
+        awning.castShadow = true;
         group.add(awning);
 
         const rackGroup = new THREE.Group();
@@ -1766,7 +1705,7 @@ export class BuildingManager {
         rackPosts.forEach(p => {
             const post = new THREE.Mesh(new THREE.BoxGeometry(0.8, 8, 0.8), woodMat);
             post.position.set(p.x, p.y + 4, p.z);
-            post.castShadow = false;
+            post.castShadow = true;
             rackGroup.add(post);
         });
         const line = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 8, 6), accentMat);
@@ -1774,31 +1713,29 @@ export class BuildingManager {
         line.position.set(-12, 7.5, 0);
         rackGroup.add(line);
         for (let i = -1; i <= 1; i++) {
-            const fish = new THREE.Mesh(new THREE.ConeGeometry(0.9, 1.8, 4), new THREE.MeshLambertMaterial({ color: 0xf4a261, flatShading: true }));
+            const fish = new THREE.Mesh(new THREE.ConeGeometry(0.9, 1.8, 4), new THREE.MeshStandardMaterial({ color: 0xf4a261, flatShading: true }));
             fish.rotation.z = Math.PI;
             fish.position.set(-12, 6.5, i * 2.5);
             rackGroup.add(fish);
         }
         group.add(rackGroup);
 
-        const crateMat = new THREE.MeshLambertMaterial({ color: 0xb08a63, flatShading: true });
+        const crateMat = new THREE.MeshStandardMaterial({ color: 0xb08a63, flatShading: true });
         const cratePositions = [
             [4, 1, 6], [6, 2, 7.5], [2, 1.5, 8]
         ];
         cratePositions.forEach((p, idx) => {
             const crate = new THREE.Mesh(new THREE.BoxGeometry(3 + idx, 2 + idx * 0.5, 3), crateMat);
             crate.position.set(p[0], p[1], p[2]);
-            crate.castShadow = false;
+            crate.castShadow = true;
             group.add(crate);
         });
 
-        group.userData = { type: 'hq', name: 'Fischerhaus', isInteractable: true };
-
         group.position.set(x, y, z);
         group.rotation.y = 0;
-
-        this.hqGroup = group;
-
+        
+        this.hqGroup = group; 
+        
         sceneSetup.scene.add(group);
         sceneSetup.registerInteractable(group);
         this.buildings.push(group);
@@ -1809,8 +1746,8 @@ export class BuildingManager {
         const y = this.getGroundHeight(x, z) + 0.8;
 
         const group = new THREE.Group();
-        const canvasMat = new THREE.MeshLambertMaterial({ color: 0xF5F5DC, flatShading: true }); 
-        const woodMat = new THREE.MeshLambertMaterial({ color: 0x8D6E63, flatShading: true });
+        const canvasMat = new THREE.MeshStandardMaterial({ color: 0xF5F5DC, flatShading: true }); 
+        const woodMat = new THREE.MeshStandardMaterial({ color: 0x8D6E63, flatShading: true });
         
         const tent = new THREE.Mesh(new THREE.ConeGeometry(8, 10, 4), canvasMat);
         tent.position.y = 5;
@@ -1820,7 +1757,7 @@ export class BuildingManager {
 
         const counter = new THREE.Mesh(new THREE.BoxGeometry(6, 3, 2), woodMat);
         counter.position.set(0, 1.5, 6);
-        counter.castShadow = false;
+        counter.castShadow = true;
         group.add(counter);
 
         group.position.set(x, y, z);
@@ -1841,19 +1778,19 @@ export class BuildingManager {
         this.bankOrigin.set(x, y, z); 
 
         const group = new THREE.Group();
-        const stoneMat = new THREE.MeshLambertMaterial({ color: 0xcfd8dc, flatShading: true });
-        const darkMat = new THREE.MeshLambertMaterial({ color: 0x455a64, flatShading: true });
-        const goldMat = new THREE.MeshLambertMaterial({ color: 0xffd54f, flatShading: true });
+        const stoneMat = new THREE.MeshStandardMaterial({ color: 0xcfd8dc, flatShading: true });
+        const darkMat = new THREE.MeshStandardMaterial({ color: 0x455a64, flatShading: true });
+        const goldMat = new THREE.MeshStandardMaterial({ color: 0xffd54f, metalness: 0.6, roughness: 0.3, flatShading: true });
 
         const foundation = this.createFoundation(34, 32, 9, 0x4f5961);
         group.add(foundation);
 
         const stairs = new THREE.Group();
-        const stepMat = new THREE.MeshLambertMaterial({ color: 0xb0bec5, flatShading: true });
+        const stepMat = new THREE.MeshStandardMaterial({ color: 0xb0bec5, flatShading: true });
         [[20, 1, 6, 12], [22, 1, 5, 14], [24, 1, 4, 16]].forEach(cfg => {
             const s = new THREE.Mesh(new THREE.BoxGeometry(cfg[0], cfg[1], cfg[2]), stepMat);
             s.position.set(0, cfg[1] * 0.5 - 0.1, cfg[3]);
-            s.castShadow = false;
+            s.castShadow = true;
             stairs.add(s);
         });
         group.add(stairs);
@@ -1869,7 +1806,7 @@ export class BuildingManager {
         group.add(cornice);
 
         for(let i = -1; i <= 1; i += 2) {
-            const p = new THREE.Mesh(new THREE.CylinderGeometry(1.8, 1.8, 14, 6), stoneMat);
+            const p = new THREE.Mesh(new THREE.CylinderGeometry(1.8, 1.8, 14, 12), stoneMat);
             p.position.set(i * 9, 7, 11); 
             p.castShadow = true; 
             group.add(p);
@@ -1901,8 +1838,8 @@ export class BuildingManager {
         });
 
         this.bankCoin = new THREE.Mesh(
-            new THREE.CylinderGeometry(3, 3, 0.7, 6), 
-            new THREE.MeshLambertMaterial({ color: 0xFFD700 }) 
+            new THREE.CylinderGeometry(3, 3, 0.7, 16), 
+            new THREE.MeshStandardMaterial({ color: 0xFFD700, metalness: 0.85, roughness: 0.18 }) 
         );
         this.bankCoin.rotation.x = Math.PI/2; 
         this.bankCoin.position.set(0, 27.5, 0); 
@@ -1928,10 +1865,10 @@ export class BuildingManager {
         this.tavernSignPivot = null;
         this.tavernSmokeGroup = null;
         
-        const wallMat = new THREE.MeshLambertMaterial({ color: 0xf2dfcc, flatShading: true });
-        const roofMat = new THREE.MeshLambertMaterial({ color: 0xb71c1c, flatShading: true });
-        const woodMat = new THREE.MeshLambertMaterial({ color: 0x8d6e63, flatShading: true });
-        const accentMat = new THREE.MeshLambertMaterial({ color: 0x32475b, flatShading: true });
+        const wallMat = new THREE.MeshStandardMaterial({ color: 0xf2dfcc, flatShading: true });
+        const roofMat = new THREE.MeshStandardMaterial({ color: 0xb71c1c, flatShading: true });
+        const woodMat = new THREE.MeshStandardMaterial({ color: 0x8d6e63, flatShading: true });
+        const accentMat = new THREE.MeshStandardMaterial({ color: 0x32475b, flatShading: true });
 
         const foundation = this.createFoundation(34, 28, 8, 0x555b66);
         group.add(foundation);
@@ -1952,7 +1889,7 @@ export class BuildingManager {
         mainRoof.castShadow = true;
         group.add(mainRoof);
 
-        const wingRoof = new THREE.Mesh(new THREE.ConeGeometry(18, 8, 4), new THREE.MeshLambertMaterial({ color: 0xa91a1a, flatShading: true }));
+        const wingRoof = new THREE.Mesh(new THREE.ConeGeometry(18, 8, 4), new THREE.MeshStandardMaterial({ color: 0xa91a1a, flatShading: true }));
         wingRoof.position.set(-12, 13, -12);
         wingRoof.rotation.y = Math.PI / 4;
         wingRoof.castShadow = true;
@@ -1961,7 +1898,7 @@ export class BuildingManager {
         [[-14, 6, -9], [14, 6, -9], [-14, 6, 9], [14, 6, 9]].forEach(pos => {
             const beam = new THREE.Mesh(new THREE.BoxGeometry(2, 12, 2), woodMat);
             beam.position.set(pos[0], pos[1], pos[2]);
-            beam.castShadow = false;
+            beam.castShadow = true;
             group.add(beam);
         });
 
@@ -1982,18 +1919,18 @@ export class BuildingManager {
 
         this.tavernSignPivot = new THREE.Group();
         this.tavernSignPivot.position.set(6, 10, 9.6);
-        const chainMat = new THREE.MeshLambertMaterial({ color: 0x3e4a54, flatShading: true });
+        const chainMat = new THREE.MeshStandardMaterial({ color: 0x3e4a54, flatShading: true, metalness: 0.4, roughness: 0.6 });
         [-1.2, 1.2].forEach(offset => {
             const chain = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 2.5, 6), chainMat);
             chain.position.set(offset, -1.2, 0);
             this.tavernSignPivot.add(chain);
         });
-        const signBoard = new THREE.Mesh(new THREE.BoxGeometry(6, 2.5, 0.6), new THREE.MeshLambertMaterial({ color: 0xffb74d, flatShading: true }));
+        const signBoard = new THREE.Mesh(new THREE.BoxGeometry(6, 2.5, 0.6), new THREE.MeshStandardMaterial({ color: 0xffb74d, flatShading: true }));
         signBoard.position.set(0, -3.4, 0);
         this.tavernSignPivot.add(signBoard);
         group.add(this.tavernSignPivot);
 
-        const lanternMat = new THREE.MeshLambertMaterial({ color: 0xffd966, emissive: 0xffc107, emissiveIntensity: 1.4, flatShading: true });
+        const lanternMat = new THREE.MeshStandardMaterial({ color: 0xffd966, emissive: 0xffc107, emissiveIntensity: 1.4, flatShading: true });
         const lanternPositions = [
             [14, 9, 10], [-14, 9, 10], [14, 9, -10], [-14, 9, -10]
         ];
@@ -2002,7 +1939,7 @@ export class BuildingManager {
         lanternPositions.forEach(pos => {
             const cube = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.2, 1.2), lanternMat);
             cube.position.set(pos[0], pos[1], pos[2]);
-            cube.castShadow = false;
+            cube.castShadow = true;
             group.add(cube);
             const light = new THREE.PointLight(0xffc107, 0.8, 35);
             light.position.set(pos[0], pos[1], pos[2]);
@@ -2015,7 +1952,7 @@ export class BuildingManager {
         for (let i = 0; i < 3; i++) {
             const puff = new THREE.Mesh(
                 new THREE.DodecahedronGeometry(0.8 + Math.random() * 0.4, 0),
-                new THREE.MeshLambertMaterial({ color: 0xe8edf2, transparent: true, opacity: 0.5, flatShading: true })
+                new THREE.MeshStandardMaterial({ color: 0xe8edf2, transparent: true, opacity: 0.5, flatShading: true })
             );
             puff.castShadow = false;
             puff.position.set(0, 0, 0);
@@ -2024,30 +1961,30 @@ export class BuildingManager {
         this.tavernSmokeGroup.position.set(6, 17, -4);
         group.add(this.tavernSmokeGroup);
 
-        const tableMaterial = new THREE.MeshLambertMaterial({ color: 0xa97455, flatShading: true });
-        const stoolMaterial = new THREE.MeshLambertMaterial({ color: 0x7b4a2e, flatShading: true });
-        const mugMat = new THREE.MeshLambertMaterial({ color: 0xffc107, emissive: 0xffd54f, emissiveIntensity: 0.2, flatShading: true });
-        const foamMat = new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true });
+        const tableMaterial = new THREE.MeshStandardMaterial({ color: 0xa97455, flatShading: true });
+        const stoolMaterial = new THREE.MeshStandardMaterial({ color: 0x7b4a2e, flatShading: true });
+        const mugMat = new THREE.MeshStandardMaterial({ color: 0xffc107, emissive: 0xffd54f, emissiveIntensity: 0.2, flatShading: true });
+        const foamMat = new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true });
         const tablePositions = [[-6, 10], [6, 4], [-10, -8]];
         tablePositions.forEach((p) => {
             const table = new THREE.Group();
-            const top = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.2, 0.8, 6), tableMaterial);
+            const top = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.2, 0.8, 10), tableMaterial);
             top.position.y = 1;
-            top.castShadow = false;
+            top.castShadow = true;
             table.add(top);
 
-            const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.2, 2, 5), stoolMaterial);
+            const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.2, 2, 8), stoolMaterial);
             leg.position.y = 0;
-            leg.castShadow = false;
+            leg.castShadow = true;
             table.add(leg);
 
             const stools = [
                 [4, 0, 0], [-3, 0, 2.5], [-3, 0, -2.5]
             ];
             stools.forEach(offset => {
-                const seat = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 1.2, 5), stoolMaterial);
+                const seat = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 1.2, 8), stoolMaterial);
                 seat.position.set(offset[0], 0.6, offset[2]);
-                seat.castShadow = false;
+                seat.castShadow = true;
                 table.add(seat);
             });
 
@@ -2060,8 +1997,8 @@ export class BuildingManager {
                 const mugBody = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.4, 0.8, 6), mugMat);
                 const mugFoam = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.38, 0.3, 6), foamMat);
                 mugFoam.position.y = 0.5;
-                mugBody.castShadow = false;
-                mugFoam.castShadow = false;
+                mugBody.castShadow = true;
+                mugFoam.castShadow = true;
                 mugGroup.add(mugBody);
                 mugGroup.add(mugFoam);
 
@@ -2077,7 +2014,7 @@ export class BuildingManager {
 
         this.tavernLights = new THREE.Group();
         this.tavernLights.visible = false;
-        const bulbGeo = new THREE.SphereGeometry(0.7, 5, 5);
+        const bulbGeo = new THREE.SphereGeometry(0.7, 8, 8);
         for (let i = 0; i < 6; i++) {
             const bulb = new THREE.Mesh(bulbGeo, new THREE.MeshBasicMaterial({ color: 0xffeb3b }));
             bulb.position.set(-12 + i * 4.5, 14 + Math.sin(i) * 0.5, 11);
@@ -2103,15 +2040,15 @@ export class BuildingManager {
         const x = 0; const z = 60;
         const y = this.getGroundHeight(x, z) + 0.8;
         const group = new THREE.Group();
-        const woodMat = new THREE.MeshLambertMaterial({ color: 0xa1887f, flatShading: true });
-        const metalMat = new THREE.MeshLambertMaterial({ color: 0x7e8a94, flatShading: true });
-        const tarpMat = new THREE.MeshLambertMaterial({ color: 0x4ecdc4, flatShading: true });
+        const woodMat = new THREE.MeshStandardMaterial({ color: 0xa1887f, flatShading: true });
+        const metalMat = new THREE.MeshStandardMaterial({ color: 0x7e8a94, flatShading: true, metalness: 0.2 });
+        const tarpMat = new THREE.MeshStandardMaterial({ color: 0x4ecdc4, flatShading: true, roughness: 0.8 });
         group.scale.set(1.05, 1.05, 1.05);
 
         const foundation = this.createFoundation(34, 30, 8, 0x4d525d);
         group.add(foundation);
 
-        const floor = new THREE.Mesh(new THREE.BoxGeometry(34, 1, 26), new THREE.MeshLambertMaterial({ color: 0x7b6958, flatShading: true }));
+        const floor = new THREE.Mesh(new THREE.BoxGeometry(34, 1, 26), new THREE.MeshStandardMaterial({ color: 0x7b6958, flatShading: true }));
         floor.position.y = 0.5;
         floor.receiveShadow = true;
         group.add(floor);
@@ -2120,7 +2057,7 @@ export class BuildingManager {
         postPositions.forEach(pos => {
             const p = new THREE.Mesh(new THREE.BoxGeometry(1.5, 16, 1.5), woodMat);
             p.position.set(pos[0], 8, pos[2]);
-            p.castShadow = false;
+            p.castShadow = true;
             group.add(p);
         });
 
@@ -2137,14 +2074,14 @@ export class BuildingManager {
 
         const keel = new THREE.Mesh(new THREE.BoxGeometry(20, 1.2, 2), woodMat);
         keel.position.set(0, 2.5, 0);
-        keel.castShadow = false;
+        keel.castShadow = true;
         group.add(keel);
 
         for (let i = -2; i <= 2; i++) {
             const rib = new THREE.Mesh(new THREE.TorusGeometry(7, 0.5, 6, 16, Math.PI), woodMat);
             rib.rotation.set(Math.PI / 2, 0, 0);
             rib.position.set(i * 3.5, 4, 0);
-            rib.castShadow = false;
+            rib.castShadow = true;
             group.add(rib);
         }
 
@@ -2152,28 +2089,28 @@ export class BuildingManager {
         supports.forEach(pos => {
             const block = new THREE.Mesh(new THREE.BoxGeometry(6, 2, 3), woodMat);
             block.position.set(pos[0], pos[1], pos[2]);
-            block.castShadow = false;
+            block.castShadow = true;
             group.add(block);
         });
 
-        const craneBase = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 10, 5), metalMat);
+        const craneBase = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 10, 8), metalMat);
         craneBase.position.set(12, 5, 8);
-        craneBase.castShadow = false;
+        craneBase.castShadow = true;
         group.add(craneBase);
 
         this.craneArm = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 12), metalMat);
         this.craneArm.position.set(12, 10.5, 1);
         this.craneArm.rotation.x = -0.2;
-        this.craneArm.castShadow = false;
+        this.craneArm.castShadow = true;
         group.add(this.craneArm);
 
         const craneLine = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 8, 6), metalMat);
         craneLine.position.set(12, 6.5, -4.5);
         group.add(craneLine);
 
-        const hook = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.6, 1.2), new THREE.MeshLambertMaterial({ color: 0xffd54f, flatShading: true }));
+        const hook = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.6, 1.2), new THREE.MeshStandardMaterial({ color: 0xffd54f, flatShading: true, metalness: 0.6 }));
         hook.position.set(12, 2.5, -4.5);
-        hook.castShadow = false;
+        hook.castShadow = true;
         group.add(hook);
         this.craneLine = craneLine;
         this.craneHook = hook;
@@ -2185,13 +2122,13 @@ export class BuildingManager {
         stackPositions.forEach((pos, idx) => {
             const stack = new THREE.Mesh(new THREE.BoxGeometry(6, 1.5 + idx * 0.3, 3), woodMat);
             stack.position.set(pos[0], pos[1], pos[2]);
-            stack.castShadow = false;
+            stack.castShadow = true;
             group.add(stack);
         });
 
         const bench = new THREE.Mesh(new THREE.BoxGeometry(10, 1.2, 3), woodMat);
         bench.position.set(0, 1, 12);
-        bench.castShadow = false;
+        bench.castShadow = true;
         group.add(bench);
 
         group.position.set(x, y, z);
@@ -2209,38 +2146,27 @@ export class BuildingManager {
 
     createDock() {
         const group = new THREE.Group();
-
-        // OPTIMIERUNG (Tab A 2016): Geometry Merging
-        // Statt 17 Meshes (1 Planke + 16 Pfosten = 17 Draw Calls) erstellen wir
-        // eine einzige verschmolzene Geometrie (1 Draw Call!)
-
-        const geometries = [];
+        const woodMat = new THREE.MeshStandardMaterial({ color: 0x8D6E63, flatShading: true });
+        
         const startZ = 75;
         const length = 70;
         const centerZ = startZ + length / 2;
 
-        // 1. Planke (Position direkt in Geometrie "backen")
-        const plankGeo = new THREE.BoxGeometry(10, 1, length);
-        plankGeo.translate(0, 4, centerZ);
-        geometries.push(plankGeo);
+        const plank = new THREE.Mesh(new THREE.BoxGeometry(10, 1, length), woodMat);
+        plank.position.set(0, 4, centerZ); 
+        plank.castShadow = true; 
+        plank.receiveShadow = true; 
+        group.add(plank);
 
-        // 2. Pfosten (Low-Poly: 5 Segmente statt 16)
         for (let z = startZ; z <= startZ + length; z += 10) {
             [-4, 4].forEach((xOff) => {
-                const postGeo = new THREE.CylinderGeometry(0.8, 0.8, 15, 5);
-                postGeo.translate(xOff, -2, z);
-                geometries.push(postGeo);
+                const p = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 15), woodMat);
+                p.position.set(xOff, -2, z); 
+                p.castShadow = true; 
+                group.add(p);
             });
         }
-
-        // 3. MERGE: Alle Geometrien zu einer einzigen zusammenfügen
-        const mergedGeo = BufferGeometryUtils.mergeGeometries(geometries);
-        const dockMesh = new THREE.Mesh(mergedGeo, this.mats.wood);
-
-        dockMesh.castShadow = true;
-        dockMesh.receiveShadow = true;
-
-        group.add(dockMesh);
+        
         group.userData = { type: 'dock', isInteractable: false };
         sceneSetup.scene.add(group);
     }

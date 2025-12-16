@@ -50,12 +50,12 @@ export function createRowBoat() {
     group.name = 'RowBoat';
 
     // Materials
-    const woodDarkMat = new THREE.MeshLambertMaterial({ color: 0x5D4037, flatShading: true, side: THREE.DoubleSide });
-    const woodLightMat = new THREE.MeshLambertMaterial({ color: 0x8D6E63, flatShading: true });
-    const woodReddishMat = new THREE.MeshLambertMaterial({ color: 0x6D4C41, flatShading: true });
-    const metalMat = new THREE.MeshLambertMaterial({ color: 0x78909C, flatShading: true });
-    const lanternGlassMat = new THREE.MeshLambertMaterial({ color: 0xFFEB3B, emissive: 0xFFA000, emissiveIntensity: 0.6, transparent: true, opacity: 0.8, flatShading: true });
-    const ropeMat = new THREE.MeshLambertMaterial({ color: 0xC5A065, flatShading: true });
+    const woodDarkMat = new THREE.MeshStandardMaterial({ color: 0x5D4037, roughness: 0.9, flatShading: true, side: THREE.DoubleSide });
+    const woodLightMat = new THREE.MeshStandardMaterial({ color: 0x8D6E63, roughness: 0.8, flatShading: true });
+    const woodReddishMat = new THREE.MeshStandardMaterial({ color: 0x6D4C41, roughness: 0.8, flatShading: true });
+    const metalMat = new THREE.MeshStandardMaterial({ color: 0x78909C, metalness: 0.6, roughness: 0.4, flatShading: true });
+    const lanternGlassMat = new THREE.MeshStandardMaterial({ color: 0xFFEB3B, emissive: 0xFFA000, emissiveIntensity: 0.6, transparent: true, opacity: 0.8, flatShading: true });
+    const ropeMat = new THREE.MeshStandardMaterial({ color: 0xC5A065, roughness: 1.0, flatShading: true });
 
 
     // 1. Rumpf (mit doppeltem Boden Logik in buildAdaptiveHullGeometry)
@@ -192,12 +192,12 @@ export function createRowBoat() {
     rodPivot.add(reel);
 
     const lineGeo = new THREE.CylinderGeometry(0.005, 0.005, 1.5, 3);
-    const line = new THREE.Mesh(lineGeo, new THREE.MeshLambertMaterial({ color: 0xFFFFFF }));
+    const line = new THREE.Mesh(lineGeo, new THREE.MeshStandardMaterial({ color: 0xFFFFFF }));
     line.position.set(0, 3.8, 0.6); 
     line.rotation.x = -0.4; 
     rodPivot.add(line);
 
-    const bobber = new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 6), new THREE.MeshLambertMaterial({ color: 0xFF5252 }));
+    const bobber = new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 6), new THREE.MeshStandardMaterial({ color: 0xFF5252 }));
     bobber.position.set(0, 3.2, 1.0);
     rodPivot.add(bobber);
     group.add(rodPivot);
