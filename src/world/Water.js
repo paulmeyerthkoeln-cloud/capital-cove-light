@@ -6,42 +6,51 @@ export class Water {
     constructor() {
         this.mesh = null;
         this.material = null;
-        this.currentHealth = 1.0;
     }
 
     init() {
-        // PERFORMANCE: 1x1 Segment reicht für statisches Wasser
-        const geometry = new THREE.PlaneGeometry(1000, 1000, 1, 1);
+        // PERFORMANCE & STABILITÄT:
+        // Wir machen die Plane riesig, damit man nie den Rand sieht.
+        const geometry = new THREE.PlaneGeometry(4000, 4000, 1, 1);
 
-        this.material = new THREE.MeshStandardMaterial({
+        // FIX: MeshBasicMaterial ignoriert Lichtberechnungen.
+        // Das verhindert schwarzes Wasser auf Handys, die Shader nicht mögen.
+        this.material = new THREE.MeshBasicMaterial({
             color: 0x2E86C1,
-            roughness: 0.4,
-            metalness: 0.1,
-            flatShading: false,
-            // WICHTIG: Undurchsichtig, um Grafikfehler zu vermeiden und Leistung zu sparen
-            transparent: false,
-            opacity: 1.0
+            side: THREE.DoubleSide, // Verhindert Unsichtbarkeit bei falschen Winkeln
+            transparent: false
         });
 
         this.mesh = new THREE.Mesh(geometry, this.material);
         this.mesh.rotation.x = -Math.PI / 2;
 
-        // FIX: Wasserspiegel auf -4.0 senken.
-        // 0 war zu hoch (Überflutung), -10 ist der Meeresboden.
-        // -4.0 zeigt mehr Strand und lässt die Insel besser zur Geltung kommen.
-        this.mesh.position.y = -4.0;
+        // FIX: Höhe leicht absenken
+        this.mesh.position.y = -3.5;
 
-        this.mesh.receiveShadow = true;
+        // --- MOBILE FIXES ---
+
+        // 1. Frustum Culling aus: Das Wasser darf NIE ausgeblendet werden,
+        // egal wohin die Kamera schaut.
+        this.mesh.frustumCulled = false;
+
+        // 2. Render Order Fix: Wir zwingen das Wasser, VOR allem anderen gemalt zu werden.
+        // Es verhält sich wie ein Skybox-Boden. Die Insel wird einfach darüber gemalt.
+        // Das löst das Problem "Wasser über der Insel" zu 100%.
+        this.mesh.renderOrder = -1;
+
+        // Keine Schatten empfangen (spart Rechenleistung und vermeidet Artefakte auf Mobile)
+        this.mesh.receiveShadow = false;
 
         if (sceneSetup && sceneSetup.scene) {
             sceneSetup.scene.add(this.mesh);
         }
 
+        // Leere Listener für Code-Kompatibilität
         events.on(EVENTS.STATS_UPDATED, () => {});
         events.on(DIRECTOR_EVENTS.PHASE_CHANGED, () => {});
     }
 
     update(time) {
-        // Keine Animation
+        // Statisch
     }
 }
