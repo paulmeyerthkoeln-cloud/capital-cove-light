@@ -100,10 +100,8 @@ class Game {
 
         const deltaMs = nowMs - this.lastFrameTimeMs;
 
-        // OPTIMIERUNG: FPS-Limiter - Frame überspringen wenn zu früh
-        if (this.fpsLimit && deltaMs < this.frameMinMs) {
-            return; // Frame überspringen
-        }
+        // FPS-Limiter entfernt - verursachte Ruckeln durch Frame-Skipping
+        // (Die Render-Loop läuft jetzt ohne künstliche Limitierung)
 
         this.lastFrameTimeMs = nowMs;
 
@@ -114,10 +112,11 @@ class Game {
             this.tickAccumulatorMs -= this.tickLengthMs;
         }
 
-        const deltaSec = (deltaMs / 1000) * this.speedMultiplier;
+        const deltaSecUnscaled = deltaMs / 1000;
+        const deltaSec = deltaSecUnscaled * this.speedMultiplier;
         const totalTime = nowMs / 1000;
 
-        this.updateVisuals(deltaSec, totalTime);
+        this.updateVisuals(deltaSec, totalTime, deltaSecUnscaled);
         sceneSetup.render();
     }
 
@@ -133,7 +132,7 @@ class Game {
         });
     }
 
-    updateVisuals(deltaSec, totalTime) {
+    updateVisuals(deltaSec, totalTime, deltaSecUnscaled) {
         if (this.water) this.water.update(totalTime);
         if (this.environment) this.environment.update(deltaSec);
         if (this.buildings) this.buildings.update(deltaSec);
@@ -142,7 +141,7 @@ class Game {
         if (this.boatManager) this.boatManager.update(deltaSec, totalTime);
         if (this.personManager) this.personManager.update(deltaSec, totalTime);
 
-        input.update();
+        input.update(deltaSecUnscaled);
     }
 
     handleObjectClick(obj) {

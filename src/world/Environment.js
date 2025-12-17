@@ -102,7 +102,8 @@ export class Environment {
     }
 
     createTreesInstanced() {
-        const treeCount = 40;
+        // PERFORMANCE: Reduziert von 40 auf 12
+        const treeCount = 12;
         
         const trunkGeo = new THREE.CylinderGeometry(1.5, 2.5, 8, 5);
         const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5D4037, flatShading: true });
@@ -192,7 +193,8 @@ export class Environment {
     }
 
     createRocksInstanced() {
-        const rockCount = 60;
+        // PERFORMANCE: Reduziert von 60 auf 15
+        const rockCount = 15;
         const geometry = new THREE.DodecahedronGeometry(1, 0);
         const material = new THREE.MeshStandardMaterial({ color: 0x90A4AE, flatShading: true });
 

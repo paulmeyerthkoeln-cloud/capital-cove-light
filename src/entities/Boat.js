@@ -83,11 +83,35 @@ class Boat {
         this.mesh.position.copy(this.position);
         this.mesh.rotation.y = Math.PI;
 
-        this.mesh.userData = { 
-            type: 'boat', 
-            id: this.dockIndex, 
-            isInteractable: true 
+        this.mesh.userData = { type: 'boat_visual' }; // Visuals ignorieren
+
+        // Riesige Hitbox (unsichtbar)
+        // Deckt das Boot und etwas Wasser drumherum ab (20x10x12)
+        const hitGeo = new THREE.BoxGeometry(16, 12, 22);
+
+        // WICHTIG: visible: true, aber opacity: 0, damit der Raycaster das Objekt "sieht"
+        // ÄNDERUNG: depthWrite: false hinzugefügt, um visuelle Artefakte zu verhindern
+        const hitMat = new THREE.MeshBasicMaterial({
+            visible: true,
+            transparent: true,
+            opacity: 0,
+            side: THREE.DoubleSide, // Hilft, Klicks von allen Seiten zu fangen
+            depthWrite: false       // <--- NEU: Verhindert "Geister"-Umrisse im Wasser/Nebel
+        });
+
+        const hitbox = new THREE.Mesh(hitGeo, hitMat);
+
+        hitbox.position.y = 4; // Leicht nach oben versetzt
+        hitbox.userData = {
+            type: 'boat',
+            id: this.dockIndex,
+            isInteractable: true
         };
+
+        this.mesh.add(hitbox);
+
+        // Hinweis: Wir registrieren immer noch this.mesh in SceneSetup, 
+        // da der Raycaster rekursiv Kinder (die Hitbox) prüft.
 
         this.updateTechVisuals();
         this.createHintMesh();

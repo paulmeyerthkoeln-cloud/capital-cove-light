@@ -831,391 +831,30 @@ export class BuildingManager {
     }
 
     update(dt) {
-        const speed = game.speedMultiplier > 0 ? game.speedMultiplier : 1;
-        const unscaledDt = dt / speed;
         const time = performance.now() * 0.001;
-        const economyActive = this.isEconomyActive && !this.isCollapsed;
-        const isAlive = this.currentMarketHealth > 0.2;
 
+        // PERFORMANCE: Partikel sofort löschen, keine Berechnung
+        this.particles = [];
+
+        // Props (statische Objekte wie Tische beim Boom) dürfen bleiben,
+        // aber wir entfernen Animationen, die Rechenleistung kosten.
+        this.props.forEach((prop) => {
+            if (prop.delay > 0) prop.delay -= dt;
+            else if (prop.mesh.scale.x < prop.targetScale) {
+                // Schnelles Einblenden ohne Mathe-Funktionen
+                prop.mesh.scale.setScalar(prop.targetScale);
+            }
+        });
+
+        // Wichtige Logik für Kräne etc. beibehalten, aber vereinfachen
         if (this.boomState.active) {
             this.boomState.timer += dt;
-
-            // Partikel (Funken) weiterhin spawnen für Atmosphäre
-            if (Math.floor(time * 2) > Math.floor((time - dt) * 2)) {
-                if (this.shipyardGroup) {
-                    this.spawnWorkParticles(this.shipyardGroup.position, 'SPARK');
-                    this.spawnWorkParticles(this.shipyardGroup.position, 'WOOD');
-                }
-            }
+            if (this.craneArm) this.craneArm.rotation.y += dt;
         }
-        
-        this.hints.forEach((hint) => {
-            if (hint.visible) {
-                hint.position.y = (hint.userData.baseY || 0) + Math.sin(time * 5 + (hint.userData.animOffset || 0)) * 2.0;
-                hint.rotation.y += dt;
-            }
-        });
 
-        if (economy.state.isSavingActive) {
-            this.flowIntensity -= dt * 0.18;
-        } else {
-            this.flowIntensity += dt * 1.0;
-        }
-        if (this.flowIntensity < 0) this.flowIntensity = 0;
-        if (this.flowIntensity > 1) this.flowIntensity = 1;
-
+        // Bank Münze drehen (wichtig für Story Feedback)
         if (this.bankCoin && this.bankGroup.visible && !this.isCollapsed) {
-            this.bankCoin.rotation.y += 1.5 * unscaledDt;
-        }
-
-        if (this.tavernSignPivot) {
-            this.tavernSignPivot.rotation.z = Math.sin(time * 1.5) * 0.12;
-        }
-
-        if (this.lanternLights.length) {
-            if (economyActive) {
-                const healthFactor = Math.max(0, this.currentMarketHealth);
-                const pulse = 1.0 + Math.sin(time * 2.5) * 0.3;
-                this.lanternLights.forEach((light) => {
-                    const base = light.userData.baseIntensity || 0.8;
-                    light.intensity = Math.max(0, base * healthFactor * pulse);
-                });
-            } else {
-                this.lanternLights.forEach((light) => { light.intensity = 0; });
-            }
-        }
-
-        if (this.craneArm) {
-            const baseRotX = this.craneArm.userData.baseRotationX ?? this.craneArm.rotation.x;
-            this.craneArm.rotation.x = baseRotX;
-            this.craneArm.rotation.y = economyActive ? Math.sin(time * 0.5) * 0.3 : 0;
-
-            if (this.craneLine) {
-                const basePos = this.craneLine.userData.basePosition || this.craneLine.position.clone();
-                this.craneLine.position.copy(basePos);
-                if (economyActive) {
-                    this.craneLine.position.z = basePos.z + Math.sin(time * 1.1) * 0.45;
-                }
-            }
-
-            if (this.craneHook) {
-                const basePos = this.craneHook.userData.basePosition || this.craneHook.position.clone();
-                this.craneHook.position.copy(basePos);
-                if (economyActive) {
-                    this.craneHook.position.y = basePos.y + Math.sin(time * 2.0) * 0.35;
-                    this.craneHook.position.z = basePos.z + Math.cos(time * 1.1) * 0.25;
-                }
-            }
-        }
-
-        const marketHealthy = this.currentMarketHealth > 0.6;
-
-        if (this.shipyardGroup && economyActive && marketHealthy) {
-            this.shipyardDustTimer += unscaledDt;
-            if (this.shipyardDustTimer > 0.2) {
-                if (Math.random() > 0.3) this.spawnShipyardDust();
-                this.shipyardDustTimer = 0;
-            }
-        } else {
-            this.shipyardDustTimer = 0;
-        }
-
-        if (this.shipyardSparks && this.shipyardSparks.visible) {
-            this.shipyardSparks.children.forEach(p => {
-                p.position.add(p.userData.velocity);
-                p.rotation.x += dt * 2;
-                p.rotation.z += dt * 2;
-                
-                if (p.position.y > 8) {
-                    p.position.y = 0;
-                    p.position.x = (Math.random() - 0.5) * 10;
-                    p.position.z = (Math.random() - 0.5) * 10;
-                }
-            });
-        }
-
-        if (this.hqSmokeGroup) {
-            this.hqSmokeGroup.children.forEach((puff, i) => {
-                puff.position.y += unscaledDt * 6;
-                puff.position.x += Math.sin(time * 1.2 + i) * 0.02;
-                puff.position.z += Math.cos(time * 0.9 + i) * 0.02;
-                puff.scale.addScalar(unscaledDt * 0.25);
-                puff.material.opacity -= unscaledDt * 0.35;
-                if (puff.material.opacity <= 0.05) {
-                    puff.position.set(0, 0, 0);
-                    puff.scale.setScalar(1);
-                    puff.material.opacity = 0.6 + Math.random() * 0.2;
-                }
-            });
-        }
-
-        if (this.tavernSmokeGroup) {
-            const smokeActive = isAlive && !this.isCollapsed;
-            this.tavernSmokeGroup.visible = smokeActive;
-            
-            if (smokeActive) {
-                const smokeDensity = 0.6 * this.currentMarketHealth; 
-                
-                this.tavernSmokeGroup.children.forEach((puff, i) => {
-                    puff.position.y += unscaledDt * 5.5;
-                    puff.position.x += Math.sin(time * 1.1 + i) * 0.02;
-                    puff.position.z += Math.cos(time * 1.0 + i) * 0.02;
-                    puff.scale.addScalar(unscaledDt * 0.2);
-                    
-                    puff.material.opacity -= unscaledDt * 0.28;
-                    
-                    if (puff.material.opacity <= 0.05) {
-                        puff.position.set(0, 0, 0);
-                        puff.scale.setScalar(1);
-                        puff.material.opacity = smokeDensity + Math.random() * 0.1;
-                    }
-                    
-                    if (puff.material.opacity > smokeDensity) {
-                         puff.material.opacity = smokeDensity;
-                    }
-                });
-            } else {
-                this.tavernSmokeGroup.children.forEach((puff) => {
-                    puff.position.set(0, 0, 0);
-                    puff.scale.setScalar(1);
-                    if (puff.material) puff.material.opacity = 0.7;
-                });
-            }
-        }
-
-        if (this.isPartyMode && this.tavernLights && this.tavernLights.visible) {
-            this.tavernLights.children.forEach((light, i) => {
-                if (light.isPointLight) {
-                    light.intensity = 1.5 + Math.sin(time * 3 + i) * 0.8;
-                    const hue = (time * 0.2 + i * 0.2) % 1;
-                    light.color.setHSL(hue, 0.8, 0.5);
-                }
-            });
-        }
-
-        if (this.tavernMugs && this.tavernMugs.length) {
-            this.tavernMugs.forEach((mug, i) => {
-                if (!mug.userData.basePosition) {
-                    mug.userData.basePosition = mug.position.clone();
-                }
-                if (mug.userData.baseRotationY === undefined) {
-                    mug.userData.baseRotationY = mug.rotation.y;
-                }
-                mug.visible = economyActive;
-                const basePos = mug.userData.basePosition;
-                if (!economyActive) {
-                    mug.position.copy(basePos);
-                    mug.rotation.y = mug.userData.baseRotationY || 0;
-                    return;
-                }
-
-                const bob = Math.sin(time * 2 + i) * 0.12;
-                const sway = Math.sin(time * 1.4 + i) * 0.15;
-                mug.position.y = basePos.y + bob;
-                mug.rotation.y = (mug.userData.baseRotationY || 0) + sway;
-            });
-        }
-
-        this.shakingBuildings.forEach((data, uuid) => {
-            data.timer -= unscaledDt;
-
-            if (data.timer <= 0) {
-                data.group.position.y = data.baseY;
-                data.group.rotation.copy(data.baseRot);
-                this.shakingBuildings.delete(uuid);
-            } else {
-                const intensity = data.timer;
-
-                if (data.type === 'REJECT') {
-                    data.group.rotation.y = data.baseRot.y + Math.sin(data.timer * 30) * 0.1 * intensity;
-                } else {
-                    // SUCCESS: Vertikales Hüpfen + Rotation für mehr Sichtbarkeit
-                    data.group.position.y = data.baseY + Math.sin(data.timer * 20) * 2.5 * intensity;
-                    data.group.rotation.x = data.baseRot.x + Math.sin(data.timer * 25) * 0.08 * intensity;
-                    data.group.rotation.z = data.baseRot.z + Math.cos(data.timer * 25) * 0.08 * intensity;
-                }
-            }
-        });
-
-        for (let i = this.particles.length - 1; i >= 0; i--) {
-            const p = this.particles[i];
-
-            if (p.isCrate) {
-                if (p.delay > 0) {
-                    p.delay -= unscaledDt;
-                    if (p.delay <= 0) p.mesh.visible = true;
-                    else continue;
-                }
-
-                p.progress += unscaledDt * p.speed;
-                
-                if (p.progress >= 1) {
-                    sceneSetup.scene.remove(p.mesh);
-                    if (p.mesh.geometry) p.mesh.geometry.dispose(); 
-                    this.particles.splice(i, 1);
-
-                    if (p.isReject) {
-                        events.emit('world:crate_landed_on_boat', { boatId: 0 });
-                    }
-                } else {
-                    const t = p.progress;
-                    p.mesh.position.x = (1 - t) * p.start.x + t * p.end.x;
-                    p.mesh.position.z = (1 - t) * p.start.z + t * p.end.z;
-                    
-                    const baseY = (1 - t) * p.start.y + t * p.end.y;
-                    const arc = p.arcHeight * 4 * t * (1 - t); 
-                    p.mesh.position.y = baseY + arc;
-
-                    p.mesh.rotation.x += p.rotationSpeed.x * 5 * unscaledDt;
-                    p.mesh.rotation.y += p.rotationSpeed.y * 5 * unscaledDt;
-                }
-            } else if (p.isBigTransfer) {
-                p.progress += dt * p.speed;
-                if (p.progress >= 1) {
-                    sceneSetup.scene.remove(p.mesh);
-                    if(p.mesh.geometry) p.mesh.geometry.dispose();
-                    this.particles.splice(i, 1);
-
-                    if (p.shouldTriggerBoom) {
-                        console.log("💰 [BUILDINGS] Geldsack angekommen bei:", p.targetType);
-
-                        if (p.targetType === 'TAVERN') {
-                            console.log("💰 [BUILDINGS] Triggere Taverne Boom!");
-                            this.triggerTavernBoom();
-                        } else if (p.targetType === 'SHIPYARD') {
-                            console.log("💰 [BUILDINGS] Triggere Werft Boom!");
-                            this.triggerShipyardBoom();
-                        }
-
-                        events.emit('world:money_transfer_arrived', { target: p.targetType });
-                    }
-                } else {
-                    const t = p.progress;
-                    p.mesh.position.x = (1 - t) * p.start.x + t * p.end.x;
-                    p.mesh.position.z = (1 - t) * p.start.z + t * p.end.z;
-                    const baseY = (1 - t) * p.start.y + t * p.end.y;
-                    const arc = Math.sin(t * Math.PI) * p.arcHeight;
-                    p.mesh.position.y = baseY + arc;
-                    p.mesh.rotation.x += dt * 5;
-                    p.mesh.rotation.z += dt * 3;
-
-                    p.trailTimer += dt;
-                    if (p.trailTimer > 0.05) {
-                        this.spawnConstructionDust(p.mesh.position, 0xFFD700, false);
-                        p.trailTimer = 0;
-                    }
-                }
-            } else if (p.isFlowCoin) {
-                if (p.delay > 0) {
-                    p.delay -= unscaledDt;
-                    if (p.delay <= 0) {
-                        p.mesh.visible = true; 
-                    } else {
-                        continue; 
-                    }
-                }
-
-                p.progress += unscaledDt * p.speed;
-
-                const maxProgress = p.maxProgress || 1;
-                if (p.progress >= maxProgress) {
-                    sceneSetup.scene.remove(p.mesh);
-                    if (p.mesh.geometry) p.mesh.geometry.dispose();
-                    this.particles.splice(i, 1);
-                } else {
-                    const tRaw = p.progress;
-                    const t = Math.min(1, tRaw / maxProgress);
-
-                    p.mesh.position.x = (1 - t) * p.start.x + t * p.end.x;
-                    p.mesh.position.z = (1 - t) * p.start.z + t * p.end.z;
-
-                    const baseY = (1 - t) * p.start.y + t * p.end.y;
-                    const arc = Math.sin(t * Math.PI) * p.arcHeight; 
-                    
-                    p.mesh.position.y = baseY + arc;
-
-                    p.mesh.rotation.z += unscaledDt * 4; 
-                    p.mesh.rotation.y += unscaledDt * 2;
-                }
-            } else if (p.isRotten) {
-                p.life -= dt;
-
-                if (p.life < 2.0) {
-                    p.mesh.position.y -= dt * 0.5;
-                    p.mesh.scale.multiplyScalar(0.99);
-                    if (p.material) {
-                        p.material.opacity = Math.max(0, p.life * 0.5);
-                    }
-                }
-
-                if (p.life <= 0) {
-                    sceneSetup.scene.remove(p.mesh);
-                    if (p.mesh.geometry) p.mesh.geometry.dispose();
-                    this.particles.splice(i, 1);
-                }
-            } else {
-                const lifeDelta = p.isDust ? unscaledDt : dt;
-
-                if (p.isSpark) {
-                    p.life -= dt * 2.0; 
-                } else {
-                    p.life -= lifeDelta;
-                }
-
-                if (p.velocity) {
-                    p.mesh.position.addScaledVector(p.velocity, lifeDelta);
-                    if (p.isDust) {
-                        p.velocity.y -= 9.8 * lifeDelta;
-                    }
-                } else {
-                    p.mesh.position.y += lifeDelta * 2.0;
-                }
-
-                if (p.isDust) {
-                    p.mesh.scale.multiplyScalar(0.98);
-                } else {
-                    p.mesh.scale.multiplyScalar(1.0 + dt);
-                }
-
-                if (p.material) {
-                    p.material.opacity = Math.max(0, p.life);
-                }
-                if (p.life <= 0) {
-                    sceneSetup.scene.remove(p.mesh);
-                    if (p.mesh.geometry) p.mesh.geometry.dispose();
-                    this.particles.splice(i, 1);
-                }
-            }
-        }
-
-        if (this.props.length > 0 && time % 1 < dt) { 
-            console.log("🎨 [BUILDINGS UPDATE] Props werden animiert:", this.props.length);
-        }
-        this.props.forEach((prop, i) => {
-            if (prop.delay > 0) {
-                prop.delay -= dt;
-                if (prop.delay <= 0 && time % 1 < dt) {
-                    console.log("🎨 [BUILDINGS] Prop", i, "Delay abgelaufen, starte Animation");
-                }
-                return;
-            }
-            if (prop.mesh.scale.x < prop.targetScale) {
-                prop.animationTime += dt * 3; 
-                let s = prop.animationTime;
-                let scale = 1 + Math.sin((s - 0.5) * Math.PI) * Math.pow(2, -5 * s);
-                if (scale > 1.05) scale = 1.05; 
-                if (s > 2) scale = 1; 
-
-                prop.mesh.scale.setScalar(scale);
-
-                if (time % 1 < dt && i === 0) { 
-                    console.log("🎨 [BUILDINGS] Prop 0 animiert - scale:", scale.toFixed(3), "animTime:", s.toFixed(2));
-                }
-            }
-        });
-
-        if (this.boomState.active) {
-            if (this.craneArm) this.craneArm.rotation.y += dt * 2;
+            this.bankCoin.rotation.y += dt;
         }
     }
 
@@ -1591,6 +1230,43 @@ export class BuildingManager {
         return mesh;
     }
 
+    // Erstellt eine transparente, aber klickbare Hitbox um eine Gebäude-Gruppe
+    createHitbox(group) {
+        if (!group) return null;
+
+        group.updateMatrixWorld(true);
+
+        const bbox = new THREE.Box3().setFromObject(group);
+        const size = new THREE.Vector3();
+        const center = new THREE.Vector3();
+        bbox.getSize(size);
+        bbox.getCenter(center);
+
+        const mat = new THREE.MeshBasicMaterial({ 
+            visible: true,        // Muss true sein für Raycast
+            transparent: true,    // Transparent aktivieren
+            opacity: 0,           // Aber vollkommen durchsichtig
+            depthWrite: false     // Optimierung: Schreibt nicht in den Tiefenbuffer
+        });
+
+        const hitbox = new THREE.Mesh(
+            new THREE.BoxGeometry(
+                Math.max(size.x, 0.01),
+                Math.max(size.y, 0.01),
+                Math.max(size.z, 0.01)
+            ),
+            mat
+        );
+
+        hitbox.position.copy(center);
+        group.worldToLocal(hitbox.position);
+
+        // Nutzerdaten beibehalten, damit Klick-Handler weiter funktionieren
+        hitbox.userData = { ...(group.userData || {}), isInteractable: true };
+
+        return hitbox;
+    }
+
     getGroundHeight(x, z) {
         const dist = Math.sqrt(x * x + z * z);
         const noise = Math.sin(x * 0.07) * Math.cos(z * 0.07) * 2 + Math.sin(x * 0.15 + z * 0.1) * 1;
@@ -1735,6 +1411,11 @@ export class BuildingManager {
         group.rotation.y = 0;
         
         this.hqGroup = group; 
+
+        const hqHitbox = this.createHitbox(group);
+        if (hqHitbox) {
+            group.add(hqHitbox);
+        }
         
         sceneSetup.scene.add(group);
         sceneSetup.registerInteractable(group);
@@ -1765,6 +1446,11 @@ export class BuildingManager {
         group.visible = false; 
 
         group.userData = { type: 'bank_tent', name: 'Sterlings Zelt', isInteractable: true };
+
+        const tentHitbox = this.createHitbox(group);
+        if (tentHitbox) {
+            group.add(tentHitbox);
+        }
 
         sceneSetup.scene.add(group);
         if (group.visible) sceneSetup.registerInteractable(group);
@@ -1850,6 +1536,11 @@ export class BuildingManager {
         group.visible = false;
 
         group.userData = { type: 'bank', name: 'Inselbank', isInteractable: true };
+
+        const bankHitbox = this.createHitbox(group);
+        if (bankHitbox) {
+            group.add(bankHitbox);
+        }
 
         sceneSetup.scene.add(group);
         this.buildings.push(group);
@@ -2031,6 +1722,11 @@ export class BuildingManager {
 
         this.tavernGroup = group;
 
+        const tavernHitbox = this.createHitbox(group);
+        if (tavernHitbox) {
+            group.add(tavernHitbox);
+        }
+
         sceneSetup.scene.add(group);
         sceneSetup.registerInteractable(group);
         this.buildings.push(group);
@@ -2136,6 +1832,11 @@ export class BuildingManager {
         group.userData = { type: 'shipyard', name: 'Werft', isInteractable: true, baseY: y };
 
         this.shipyardGroup = group;
+        
+        const shipyardHitbox = this.createHitbox(group);
+        if (shipyardHitbox) {
+            group.add(shipyardHitbox);
+        }
         
         this.shipyardSparks = this.createWorkParticles(new THREE.Vector3(x, y + 2, z));
 

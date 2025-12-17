@@ -20,35 +20,32 @@ class SceneSetup {
         const container = document.getElementById('canvas-container');
 
         this.scene = new THREE.Scene();
-        
-        // NEW: Sky Blue Background
-        const skyColor = 0x87CEEB; 
-        this.scene.background = new THREE.Color(skyColor);
 
-        // UPDATED: Fog matches sky color for seamless horizon
+        const skyColor = 0x87CEEB;
+        this.scene.background = new THREE.Color(skyColor);
         this.fog = new THREE.Fog(skyColor, 400, 1600);
         this.scene.fog = this.fog;
 
         this.camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 1, 3000);
-        this.camera.position.set(280, 180, 280); 
+        this.camera.position.set(280, 180, 280);
         this.camera.lookAt(0, 10, 0);
 
+        // ULTRA PERFORMANCE SETTINGS
         this.renderer = new THREE.WebGLRenderer({
-            antialias: false, // PERFORMANCE: AA aus für massive FPS-Gewinne auf Tablets
+            antialias: false, // Kanten glätten AUS
             alpha: false,
             powerPreference: "high-performance",
-            stencil: false, // PERFORMANCE: Stencil Buffer deaktivieren wenn nicht benötigt
-            depth: true
+            stencil: false,
+            depth: true,
+            precision: 'mediump' // Geringere Präzision für Shader
         });
-        
-        // PERFORMANCE: Retina-Displays rendern wir nur mit Pixelratio 1 für Tablets/Mobile.
-        this.renderer.setPixelRatio(1.0);
+
+        // Rendert nur mit 75% der Display-Auflösung (massiver Schub auf Retina/High-DPI)
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.0) * 0.75);
         this.renderer.setSize(window.innerWidth, window.innerHeight);
 
-        this.renderer.shadowMap.enabled = true;
-        // OPTIMIERUNG: BasicShadowMap statt PCFSoftShadowMap für bessere Performance
-        this.renderer.shadowMap.type = THREE.BasicShadowMap;
-        this.renderer.shadowMap.autoUpdate = false;
+        // SCHATTEN KOMPLETT AUS
+        this.renderer.shadowMap.enabled = false;
 
         if (container) {
             container.innerHTML = '';
@@ -94,9 +91,15 @@ class SceneSetup {
     registerInteractable(object3D) {
         if (!object3D) return;
 
-        if (object3D.userData && object3D.userData.isInteractable) {
-            this.interactableObjects.push(object3D);
-        }
+        // Traverse: Suche rekursiv nach Objekten mit dem Flag isInteractable
+        object3D.traverse((child) => {
+            if (child.userData && child.userData.isInteractable) {
+                // Vermeide Duplikate
+                if (!this.interactableObjects.includes(child)) {
+                    this.interactableObjects.push(child);
+                }
+            }
+        });
     }
 
     unregisterInteractable(object3D) {

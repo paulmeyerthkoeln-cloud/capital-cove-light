@@ -3078,3 +3078,43 @@ button, .btn, .btn-action, .menu-btn, #dialog-close-btn,
     touch-action: auto;
     pointer-events: auto;
 }
+
+/* --- BOOM & BUST VISUALS --- */
+
+/* Geister-Arbeiter Animation */
+.worker-ghost {
+    position: absolute;
+    font-size: 24px;
+    pointer-events: none;
+    z-index: 50;
+    opacity: 0;
+    animation: workerFadeOut 2.5s infinite ease-out;
+}
+
+@keyframes workerFadeOut {
+    0% { opacity: 1; transform: translateY(0) scale(1); filter: grayscale(0); }
+    50% { opacity: 0.5; filter: grayscale(1); }
+    100% { opacity: 0; transform: translateY(-30px) scale(0.8); }
+}
+
+/* Bank-Abfluss Badge */
+.bank-drain-badge {
+    position: absolute;
+    top: -20px;
+    right: -20px;
+    background: #c0392b;
+    color: white;
+    font-weight: 800;
+    font-size: 0.8rem;
+    padding: 4px 8px;
+    border-radius: 4px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    animation: pulseRedBorder 1.5s infinite;
+}
+
+/* Durchkreuzter Pfeil */
+.arrow-path.crossed {
+    stroke: #c0392b !important;
+    stroke-dasharray: 5, 5;
+    opacity: 0.5;
+}
